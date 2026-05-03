@@ -29,7 +29,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
@@ -60,29 +60,49 @@
             }
         });
 
+        // 관리자 리스너 수정: 데이터 경로 및 실시간 갱신 로직 강화
         function setupAdminListener() {
             const list = document.getElementById('admin-list');
             const count = document.getElementById('admin-count');
+            
+            // 필수: 경로 규칙 준수 /artifacts/{appId}/public/data/{collectionName}
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
             
             onSnapshot(q, (snapshot) => {
                 const docs = [];
-                snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-                docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                snapshot.forEach(doc => {
+                    docs.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // 메모리 내에서 최신순 정렬 (복합 쿼리 인덱스 에러 방지)
+                docs.sort((a, b) => {
+                    const timeA = a.createdAt?.seconds || 0;
+                    const timeB = b.createdAt?.seconds || 0;
+                    return timeB - timeA;
+                });
                 
                 if (count) count.innerText = docs.length;
                 if (list) {
-                    list.innerHTML = docs.map(doc => `
-                        <div class="p-4 border-b border-slate-100 bg-white hover:bg-slate-50 transition-colors">
-                            <div class="flex justify-between items-center mb-1">
-                                <span class="font-bold text-slate-800">${doc.name || '미입력'}</span>
-                                <span class="text-[10px] text-slate-400">${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString() : '전송중'}</span>
+                    if (docs.length === 0) {
+                        list.innerHTML = '<div class="p-20 text-center text-slate-300 font-bold">상담 내역이 없습니다.</div>';
+                    } else {
+                        list.innerHTML = docs.map(doc => `
+                            <div class="p-5 border-b border-slate-100 bg-white hover:bg-orange-50 transition-colors">
+                                <div class="flex justify-between items-start mb-2">
+                                    <span class="font-black text-slate-800 text-base">${doc.name || '이름 없음'}</span>
+                                    <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded-md font-bold">
+                                        ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '전송 중...'}
+                                    </span>
+                                </div>
+                                <div class="text-brand-600 font-black text-lg tracking-tight">${doc.phone || '연락처 없음'}</div>
                             </div>
-                            <div class="text-brand-500 font-medium text-sm">${doc.phone || '-'}</div>
-                        </div>
-                    `).join('') || '<div class="p-20 text-center text-slate-300">상담 내역이 없습니다.</div>';
+                        `).join('');
+                    }
                 }
-            }, (error) => console.error("Admin Listener Error:", error));
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+                if (list) list.innerHTML = `<div class="p-10 text-center text-red-400 text-sm">데이터를 불러오지 못했습니다.<br>${error.message}</div>`;
+            });
         }
     </script>
 
@@ -98,6 +118,7 @@
         }
         #admin-view.open { display: block; }
         input::placeholder { color: #cbd5e1; font-weight: 400; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="font-sans text-slate-900 overflow-x-hidden">
@@ -247,7 +268,7 @@
     <script>
         lucide.createIcons();
 
-        // 관리자 모드 트리거
+        // 관리자 모드 트리거 (로고 3번 클릭)
         let clicks = 0;
         document.getElementById('logo-btn').addEventListener('click', () => {
             clicks++;
@@ -257,20 +278,22 @@
 
         function toggleAdmin() { document.getElementById('admin-view').classList.toggle('open'); }
 
-        // 전송 로직
+        // 전송 로직 수정
         const submitBtn = document.getElementById('submit-btn');
         const formMsg = document.getElementById('form-msg');
 
         submitBtn.addEventListener('click', async () => {
-            const name = document.getElementById('name').value.trim();
-            const phone = document.getElementById('phone').value.trim();
+            const nameInput = document.getElementById('name');
+            const phoneInput = document.getElementById('phone');
+            const name = nameInput.value.trim();
+            const phone = phoneInput.value.trim();
 
             if (!window.fb.auth.currentUser) {
-                alert('서버와 연결 중입니다. 1~2초 후 다시 시도해주세요.');
+                alert('서버 인증 중입니다. 잠시 후 다시 시도해주세요.');
                 return;
             }
 
-            if (!name || !phone) { alert('정보를 모두 입력해주세요.'); return; }
+            if (!name || !phone) { alert('매장명과 연락처를 입력해주세요.'); return; }
 
             submitBtn.disabled = true;
             submitBtn.innerText = "전송 중...";
@@ -278,28 +301,33 @@
 
             try {
                 const { db, appId, collection, addDoc, serverTimestamp } = window.fb;
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'consultations'), {
-                    name, phone, createdAt: serverTimestamp()
+                // 명시적인 경로 설정
+                const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
+                
+                await addDoc(colRef, {
+                    name, 
+                    phone, 
+                    createdAt: serverTimestamp()
                 });
 
                 submitBtn.innerText = "신청 완료";
-                submitBtn.classList.replace('bg-brand-500', 'bg-green-500');
-                formMsg.innerText = "전문가가 곧 연락드리겠습니다.";
+                submitBtn.style.backgroundColor = "#22c55e"; // Success green
+                formMsg.innerText = "상담 신청이 정상적으로 접수되었습니다.";
                 
-                document.getElementById('name').value = "";
-                document.getElementById('phone').value = "";
+                nameInput.value = "";
+                phoneInput.value = "";
 
                 setTimeout(() => {
                     submitBtn.disabled = false;
                     submitBtn.innerText = "신청하기";
-                    submitBtn.classList.replace('bg-green-500', 'bg-brand-500');
+                    submitBtn.style.backgroundColor = ""; // Reset to brand-500
                     formMsg.style.opacity = "0";
                     formMsg.innerText = "전송 중입니다...";
-                }, 3000);
+                }, 4000);
 
             } catch (err) {
                 console.error("Submit Error:", err);
-                formMsg.innerText = "오류가 발생했습니다. 다시 시도해주세요.";
+                formMsg.innerText = "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
                 submitBtn.disabled = false;
                 submitBtn.innerText = "다시 신청하기";
             }
