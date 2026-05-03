@@ -61,13 +61,11 @@
             }
         };
 
-        // 인증 상태 변경 감지 후 리스너 설정
+        // 인증 상태 변경 감지
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                console.log("인증 성공:", user.uid);
                 setupRealtimeListener();
             } else {
-                console.log("인증 정보 없음, 재시도 중...");
                 initAuth();
             }
         });
@@ -97,11 +95,7 @@
                     </div>
                 `).join('') || '<p class="p-12 text-center text-slate-400 text-xs italic">상담 내역이 없습니다.</p>';
             }, (error) => {
-                console.error("Firestore 오류:", error);
-                if (error.code === 'permission-denied') {
-                    console.log("권한 재획득 시도 중...");
-                    initAuth();
-                }
+                console.error("Firestore 리스너 오류:", error);
             });
         }
 
@@ -112,19 +106,48 @@
         html { scroll-behavior: smooth; }
         .hero-bg { background: linear-gradient(180deg, #FFF9F3 0%, #FFFFFF 100%); }
         .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); transition: all 0.3s; }
-        #admin-panel { display: none; position: fixed; bottom: 90px; right: 25px; width: 340px; z-index: 1000; }
+        
+        /* 관리자 패널 기본 숨김 */
+        #admin-panel { display: none; position: fixed; bottom: 20px; right: 20px; width: 340px; z-index: 1000; }
         #admin-panel.active { display: block; }
-        /* 버튼이 항상 보이도록 보정 */
-        .admin-trigger { display: flex !important; }
+        
+        /* 커스텀 토스트 메시지 스타일 */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 12px;
+            padding: 16px;
+            position: fixed;
+            z-index: 2000;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-weight: bold;
+        }
+        #toast.show {
+            visibility: visible;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body class="font-sans text-slate-800">
 
+    <!-- 토스트 메시지 (성공 알림용) -->
+    <div id="toast">상담 신청이 완료되었습니다!</div>
+
     <!-- 네비게이션 -->
     <header class="fixed w-full bg-white/90 backdrop-blur-md z-50 border-b border-slate-100 h-16 flex items-center px-6">
         <div class="max-w-6xl mx-auto w-full flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-lg"><i data-lucide="bot" class="text-white w-5 h-5"></i></div>
+            <!-- 로고 영역: 3번 클릭 시 관리자 모드 활성화 -->
+            <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleLogoClick()">
+                <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-lg">
+                    <i data-lucide="bot" class="text-white w-5 h-5"></i>
+                </div>
                 <span class="font-black text-xl tracking-tighter text-slate-900">AI러키봇</span>
             </div>
             <div class="flex items-center gap-6">
@@ -150,41 +173,20 @@
     <!-- 요금 안내 -->
     <section id="models" class="py-24 px-6 bg-white">
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-            <!-- 리퍼 요금제 -->
             <div class="bg-slate-50 p-8 rounded-[40px] border border-slate-100 flex flex-col">
                 <span class="text-[10px] font-bold text-slate-400 mb-4 bg-white w-fit px-3 py-1 rounded-full">실속형</span>
                 <h3 class="text-xl font-black mb-6">러키봇 (리퍼)</h3>
-                <div class="mb-10">
-                    <span class="text-4xl font-black text-brand-500">299,000</span><span class="text-sm font-bold ml-1 text-slate-400">원/월</span>
-                </div>
-                <ul class="space-y-4 text-xs font-bold text-slate-500 mb-8">
-                    <li class="flex justify-between border-b border-slate-200 pb-2"><span>일시불가</span><span class="text-slate-900">950만원</span></li>
-                    <li class="flex justify-between text-brand-600"><span>결합 할인</span><span>최대 -10만원</span></li>
-                </ul>
+                <div class="mb-10"><span class="text-4xl font-black text-brand-500">299,000</span><span class="text-sm font-bold ml-1 text-slate-400">원/월</span></div>
             </div>
-            <!-- 신품 요금제 -->
             <div class="bg-brand-500 p-8 rounded-[40px] shadow-2xl text-white flex flex-col scale-105 z-10">
                 <span class="text-[10px] font-bold text-orange-200 mb-4 bg-brand-600 w-fit px-3 py-1 rounded-full uppercase">인기 모델</span>
                 <h3 class="text-xl font-black mb-6">러키봇 (신품)</h3>
-                <div class="mb-10 text-white">
-                    <span class="text-4xl font-black">399,000</span><span class="text-sm font-bold ml-1 opacity-70">원/월</span>
-                </div>
-                <ul class="space-y-4 text-xs font-bold mb-8">
-                    <li class="flex justify-between border-b border-orange-400 pb-2"><span>일시불가</span><span class="font-black">1,180만원</span></li>
-                    <li class="flex justify-between"><span>결합 할인</span><span>최대 -15만원</span></li>
-                </ul>
+                <div class="mb-10"><span class="text-4xl font-black">399,000</span><span class="text-sm font-bold ml-1 opacity-70">원/월</span></div>
             </div>
-            <!-- 프로 요금제 -->
             <div class="bg-slate-900 p-8 rounded-[40px] text-white flex flex-col">
                 <span class="text-[10px] font-bold text-slate-500 mb-4 bg-slate-800 w-fit px-3 py-1 rounded-full">프리미엄</span>
                 <h3 class="text-xl font-black mb-6">러키봇 프로</h3>
-                <div class="mb-10">
-                    <span class="text-4xl font-black">499,000</span><span class="text-sm font-bold ml-1 text-slate-500">원/월</span>
-                </div>
-                <ul class="space-y-4 text-xs font-bold text-slate-400 mb-8">
-                    <li class="flex justify-between border-b border-slate-800 pb-2"><span>일시불가</span><span class="text-white">1,540만원</span></li>
-                    <li class="flex justify-between text-brand-500"><span>결합 할인</span><span>최대 -20만원</span></li>
-                </ul>
+                <div class="mb-10"><span class="text-4xl font-black">499,000</span><span class="text-sm font-bold ml-1 text-slate-500">원/월</span></div>
             </div>
         </div>
     </section>
@@ -204,12 +206,12 @@
         </div>
     </section>
 
-    <!-- 관리자 대시보드 UI -->
+    <!-- 관리자 대시보드 UI (기본 숨김) -->
     <div id="admin-panel" class="bg-white shadow-2xl rounded-3xl overflow-hidden border border-slate-200">
         <div class="bg-slate-900 p-4 flex justify-between items-center text-white">
             <div class="flex items-center gap-2">
                 <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span class="font-bold text-[10px] uppercase">Real-time Admin</span>
+                <span class="font-bold text-[10px] uppercase">관리자 모드</span>
             </div>
             <div class="flex items-center gap-3">
                 <span id="submission-count" class="bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">0</span>
@@ -217,14 +219,9 @@
             </div>
         </div>
         <div id="admin-list" class="max-h-[400px] overflow-y-auto divide-y divide-slate-50 bg-white">
-            <p class="p-12 text-center text-slate-400 text-xs italic">데이터 확인 중...</p>
+            <p class="p-12 text-center text-slate-400 text-xs italic">데이터를 불러오는 중...</p>
         </div>
     </div>
-
-    <!-- 플로팅 관리 버튼 -->
-    <button onclick="toggleAdmin()" class="admin-trigger fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center border border-slate-100 text-slate-400 hover:text-brand-500 transition-all z-[999]">
-        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
-    </button>
 
     <footer class="py-12 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
         &copy; 2026 AI Lucky Bot. All Rights Reserved.
@@ -233,8 +230,31 @@
     <script>
         lucide.createIcons();
         
+        let clickCount = 0;
+        let clickTimer;
+
+        // 로고 클릭 핸들러 (3번 클릭 시 관리자 모드 토글)
+        function handleLogoClick() {
+            clickCount++;
+            clearTimeout(clickTimer);
+            
+            if (clickCount >= 3) {
+                toggleAdmin();
+                clickCount = 0;
+            } else {
+                clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+            }
+        }
+
         function toggleAdmin() { 
-            document.getElementById('admin-panel').classList.toggle('active'); 
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('active'); 
+        }
+
+        function showToast() {
+            const toast = document.getElementById("toast");
+            toast.className = "show";
+            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
         }
 
         document.getElementById('consultation-form').addEventListener('submit', async (e) => {
@@ -244,38 +264,27 @@
             const txt = document.getElementById('btn-text');
             const loader = document.getElementById('loading');
             
-            // 인증이 아직 안 된 경우 재시도
-            if (!window.auth.currentUser) {
-                txt.innerText = "인증 중...";
-                try {
-                    await window.auth.signInAnonymously();
-                } catch(e) {
-                    alert('네트워크 연결을 확인해주세요.');
-                    return;
-                }
-            }
-
             btn.disabled = true; 
-            txt.innerText = "처리 중..."; 
+            txt.innerText = "전송 중..."; 
             loader.classList.remove('hidden');
 
             const name = document.getElementById('user-name').value;
             const phone = document.getElementById('user-phone').value;
 
             try {
-                // 데이터 추가 시도
+                // 데이터 저장
                 await window.addDoc(window.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'consultations'), {
                     name: name,
                     phone: phone,
                     createdAt: window.serverTimestamp()
                 });
                 
-                alert('신청이 완료되었습니다!');
+                // 성공 알림 및 초기화
+                showToast();
                 document.getElementById('consultation-form').reset();
-                document.getElementById('admin-panel').classList.add('active');
             } catch (err) { 
-                console.error("데이터 저장 오류:", err);
-                alert('잠시 후 다시 시도해주세요.'); 
+                console.error("저장 실패:", err);
+                alert('연결이 불안정합니다. 잠시 후 다시 시도해주세요.'); 
             } finally { 
                 btn.disabled = false; 
                 txt.innerText = "신청하기"; 
