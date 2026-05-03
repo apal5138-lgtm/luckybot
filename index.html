@@ -36,7 +36,8 @@
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v8';
 
-        window.fbUtils = { db, auth, appId, collection, addDoc, onSnapshot, serverTimestamp };
+        // 전역 객체에 필요한 함수 연결
+        window.fbUtils = { db, auth, appId, collection, addDoc, onSnapshot, serverTimestamp, signInAnonymously, signInWithCustomToken };
 
         const initAuth = async () => {
             try {
@@ -45,13 +46,16 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (e) { console.error("Auth Error:", e); }
+            } catch (e) { 
+                console.error("Auth Error:", e);
+                // 실패 시 한 번 더 익명 로그인 시도
+                await signInAnonymously(auth).catch(() => {});
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 setupRealtimeListener();
-                // 인증 완료 여부와 관계없이 버튼은 활성화 상태로 두어 '연결 중' 멈춤 방지
                 const btn = document.getElementById('submit-btn');
                 if (btn) btn.disabled = false;
             } else {
@@ -83,7 +87,9 @@
                         </div>
                     `).join('') || '<div class="p-10 text-center text-slate-300 text-xs italic">신청 데이터가 없습니다.</div>';
                 }
-            }, (err) => {});
+            }, (err) => {
+                console.warn("Snapshot error (expected if permissions limited):", err);
+            });
         }
     </script>
 
@@ -198,7 +204,7 @@
     <script>
         lucide.createIcons();
 
-        // 관리자 모드 트리거
+        // 관리자 모드 트리거 (로고 3번 클릭)
         let clickCount = 0;
         document.getElementById('logo-trigger').addEventListener('click', () => {
             clickCount++;
@@ -218,8 +224,10 @@
         submitBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             
-            const name = document.getElementById('user-name').value.trim();
-            const phone = document.getElementById('user-phone').value.trim();
+            const nameEl = document.getElementById('user-name');
+            const phoneEl = document.getElementById('user-phone');
+            const name = nameEl.value.trim();
+            const phone = phoneEl.value.trim();
 
             if (!name || !phone) {
                 alert('이름과 연락처를 모두 입력해주세요.');
@@ -230,12 +238,24 @@
             submitBtn.innerText = "전송 중...";
 
             try {
-                if (!window.fbUtils) {
-                    throw new Error("연결 준비 중입니다. 잠시만 기다려주세요.");
+                // fbUtils가 로드될 때까지 최대 3초 대기
+                let attempts = 0;
+                while (!window.fbUtils && attempts < 30) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
                 }
 
-                const { db, appId, collection, addDoc, serverTimestamp } = window.fbUtils;
+                if (!window.fbUtils) {
+                    throw new Error("서버 연결에 실패했습니다. 페이지를 새로고침 해주세요.");
+                }
+
+                const { db, auth, appId, collection, addDoc, serverTimestamp, signInAnonymously } = window.fbUtils;
                 
+                // 세션이 끊겼을 경우 재인증
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                }
+
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'consultations'), {
                     name: name,
                     phone: phone,
@@ -243,10 +263,11 @@
                 });
 
                 alert('상담 신청이 완료되었습니다. 담당자가 곧 연락드리겠습니다.');
-                document.getElementById('consultation-form').reset();
+                nameEl.value = "";
+                phoneEl.value = "";
             } catch (err) {
                 console.error(err);
-                alert(err.message || '오류가 발생했습니다. 다시 시도해주세요.');
+                alert('전송 오류가 발생했습니다: ' + err.message);
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerText = "신청하기";
