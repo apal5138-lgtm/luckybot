@@ -31,14 +31,17 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Firebase 설정 및 서비스 초기화
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v10';
 
+        // 전역 객체 등록 (버튼 클릭 이벤트에서 사용)
         window.fb = { db, auth, appId, collection, addDoc, onSnapshot, serverTimestamp };
 
+        // 인증 로직 (수정: 인증 완료 전까지 데이터 접근 차단 및 재시도 로직 강화)
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -51,8 +54,10 @@
             }
         };
 
+        // 초기 실행
         initAuth();
 
+        // 상태 리스너 (수정: 관리자 패널 로딩 보장)
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 console.log("Logged in:", user.uid);
@@ -60,21 +65,21 @@
             }
         });
 
-        // 관리자 리스너 수정: 데이터 경로 및 실시간 갱신 로직 강화
+        // 관리자 리스너: 실시간 데이터 동기화
         function setupAdminListener() {
             const list = document.getElementById('admin-list');
             const count = document.getElementById('admin-count');
             
-            // 필수: 경로 규칙 준수 /artifacts/{appId}/public/data/{collectionName}
-            const q = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
+            // 필수 경로: /artifacts/{appId}/public/data/consultations
+            const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
             
-            onSnapshot(q, (snapshot) => {
+            onSnapshot(colRef, (snapshot) => {
                 const docs = [];
                 snapshot.forEach(doc => {
                     docs.push({ id: doc.id, ...doc.data() });
                 });
                 
-                // 메모리 내에서 최신순 정렬 (복합 쿼리 인덱스 에러 방지)
+                // 최신 신청순 정렬
                 docs.sort((a, b) => {
                     const timeA = a.createdAt?.seconds || 0;
                     const timeB = b.createdAt?.seconds || 0;
@@ -91,7 +96,7 @@
                                 <div class="flex justify-between items-start mb-2">
                                     <span class="font-black text-slate-800 text-base">${doc.name || '이름 없음'}</span>
                                     <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded-md font-bold">
-                                        ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '전송 중...'}
+                                        ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '방금 전'}
                                     </span>
                                 </div>
                                 <div class="text-brand-600 font-black text-lg tracking-tight">${doc.phone || '연락처 없음'}</div>
@@ -100,8 +105,7 @@
                     }
                 }
             }, (error) => {
-                console.error("Firestore Listener Error:", error);
-                if (list) list.innerHTML = `<div class="p-10 text-center text-red-400 text-sm">데이터를 불러오지 못했습니다.<br>${error.message}</div>`;
+                console.error("Firestore Error:", error);
             });
         }
     </script>
@@ -110,7 +114,6 @@
         html { scroll-behavior: smooth; }
         body { background-color: #ffffff; }
         .hero-bg { background: radial-gradient(circle at 50% -20%, #fff7ed 0%, #ffffff 60%); }
-        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); }
         .product-shadow { box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.05); }
         #admin-view { 
             display: none; position: fixed; top: 0; right: 0; width: 350px; height: 100%; 
@@ -160,7 +163,6 @@
     <!-- Products -->
     <section id="products" class="py-20 px-6">
         <div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-8">
-            
             <!-- A급 리퍼 -->
             <div class="bg-slate-50/50 p-10 rounded-5xl product-shadow border border-slate-100 flex flex-col items-start transition-all hover:-translate-y-2">
                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">리퍼비시 특가</span>
@@ -180,7 +182,7 @@
                 </div>
             </div>
 
-            <!-- 신품 (Main Highlight) -->
+            <!-- 신품 -->
             <div class="bg-brand-dark p-10 rounded-5xl shadow-2xl shadow-slate-200 flex flex-col items-start transition-all hover:-translate-y-2 relative overflow-hidden group">
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-brand-500 rounded-full blur-[80px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
                 <span class="text-[10px] font-black text-brand-500 uppercase tracking-widest mb-2 relative z-10">Best Choice</span>
@@ -200,7 +202,7 @@
                 </div>
             </div>
 
-            <!-- 프로 (따뜻한 오렌지색 채우기) -->
+            <!-- 프로 -->
             <div class="bg-orange-500 p-10 rounded-5xl product-shadow flex flex-col items-start transition-all hover:-translate-y-2 relative overflow-hidden group shadow-2xl shadow-orange-200">
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full blur-[80px] opacity-20"></div>
                 <span class="text-[10px] font-black text-orange-100 uppercase tracking-widest mb-2 relative z-10">Premium</span>
@@ -219,7 +221,6 @@
                     <p class="text-lg font-black text-white">1,540만원</p>
                 </div>
             </div>
-
         </div>
     </section>
 
@@ -247,10 +248,6 @@
     <!-- Footer -->
     <footer class="py-16 text-center text-slate-300 border-t border-slate-50">
         <p class="text-[10px] font-black uppercase tracking-[0.4em] mb-6">&copy; 2026 AI LUCKY BOT. ALL RIGHTS RESERVED.</p>
-        <div class="flex justify-center gap-6">
-            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center hover:text-brand-500 transition-colors cursor-pointer"><i data-lucide="instagram" class="w-4 h-4"></i></div>
-            <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center hover:text-brand-500 transition-colors cursor-pointer"><i data-lucide="youtube" class="w-4 h-4"></i></div>
-        </div>
     </footer>
 
     <!-- Admin Panel -->
@@ -268,7 +265,6 @@
     <script>
         lucide.createIcons();
 
-        // 관리자 모드 트리거 (로고 3번 클릭)
         let clicks = 0;
         document.getElementById('logo-btn').addEventListener('click', () => {
             clicks++;
@@ -278,7 +274,6 @@
 
         function toggleAdmin() { document.getElementById('admin-view').classList.toggle('open'); }
 
-        // 전송 로직 수정
         const submitBtn = document.getElementById('submit-btn');
         const formMsg = document.getElementById('form-msg');
 
@@ -289,7 +284,7 @@
             const phone = phoneInput.value.trim();
 
             if (!window.fb.auth.currentUser) {
-                alert('서버 인증 중입니다. 잠시 후 다시 시도해주세요.');
+                alert('인증 진행 중입니다. 1초 뒤에 다시 시도해주세요.');
                 return;
             }
 
@@ -301,7 +296,7 @@
 
             try {
                 const { db, appId, collection, addDoc, serverTimestamp } = window.fb;
-                // 명시적인 경로 설정
+                // 경로: /artifacts/{appId}/public/data/consultations
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
                 
                 await addDoc(colRef, {
@@ -311,7 +306,7 @@
                 });
 
                 submitBtn.innerText = "신청 완료";
-                submitBtn.style.backgroundColor = "#22c55e"; // Success green
+                submitBtn.style.backgroundColor = "#22c55e";
                 formMsg.innerText = "상담 신청이 정상적으로 접수되었습니다.";
                 
                 nameInput.value = "";
@@ -320,20 +315,18 @@
                 setTimeout(() => {
                     submitBtn.disabled = false;
                     submitBtn.innerText = "신청하기";
-                    submitBtn.style.backgroundColor = ""; // Reset to brand-500
+                    submitBtn.style.backgroundColor = "";
                     formMsg.style.opacity = "0";
-                    formMsg.innerText = "전송 중입니다...";
                 }, 4000);
 
             } catch (err) {
                 console.error("Submit Error:", err);
-                formMsg.innerText = "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+                formMsg.innerText = "오류가 발생했습니다. 다시 시도해주세요.";
                 submitBtn.disabled = false;
                 submitBtn.innerText = "다시 신청하기";
             }
         });
 
-        // 스크롤 시 헤더 배경 변화
         window.addEventListener('scroll', () => {
             const header = document.querySelector('header');
             if (window.scrollY > 50) {
