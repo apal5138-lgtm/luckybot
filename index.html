@@ -29,17 +29,15 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 환경 설정 (Canvas에서 자동 주입)
+        // 환경 설정
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v8';
 
-        // 전역 객체에 안전하게 등록
         window.fbUtils = { db, auth, appId, collection, addDoc, onSnapshot, serverTimestamp };
 
-        // 인증 초기화 및 상태 감지
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -52,9 +50,8 @@
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                console.log("Auth Active:", user.uid);
                 setupRealtimeListener();
-                // 인증 완료 시 버튼 활성화
+                // 인증 완료 여부와 관계없이 버튼은 활성화 상태로 두어 '연결 중' 멈춤 방지
                 const btn = document.getElementById('submit-btn');
                 if (btn) btn.disabled = false;
             } else {
@@ -62,7 +59,6 @@
             }
         });
 
-        // 실시간 관리자 리스트 업데이트
         function setupRealtimeListener() {
             const list = document.getElementById('admin-list');
             const badge = document.getElementById('submission-count');
@@ -80,20 +76,20 @@
                             <div class="flex justify-between items-center mb-1">
                                 <span class="font-bold text-slate-800 text-sm">${doc.name || '무명'}</span>
                                 <span class="text-[9px] text-slate-400">
-                                    ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleTimeString() : '진행중'}
+                                    ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleTimeString() : '방금'}
                                 </span>
                             </div>
                             <div class="text-xs text-brand-500 font-mono font-bold">${doc.phone || '-'}</div>
                         </div>
                     `).join('') || '<div class="p-10 text-center text-slate-300 text-xs italic">신청 데이터가 없습니다.</div>';
                 }
-            }, (err) => console.log("Snapshot Error (Ignore if permission denied):", err));
+            }, (err) => {});
         }
     </script>
 
     <style>
         html { scroll-behavior: smooth; }
-        .hero-bg { background: radial-gradient(circle at top right, #fff7ed, #ffffff); }
+        .hero-bg { background: linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%); }
         #admin-panel { 
             display: none; position: fixed; bottom: 24px; right: 24px; width: 320px; 
             z-index: 9999; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); 
@@ -101,84 +97,108 @@
         }
         #admin-panel.active { display: block; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .floating-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .floating-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body class="font-sans text-slate-800 bg-white">
 
-    <header class="fixed w-full bg-white/90 backdrop-blur-md z-[100] border-b border-slate-100 h-16 flex items-center px-6">
+    <header class="fixed w-full bg-white/80 backdrop-blur-lg z-[100] border-b border-slate-50 h-20 flex items-center px-6">
         <div class="max-w-6xl mx-auto w-full flex justify-between items-center">
             <div class="flex items-center gap-2 cursor-pointer select-none group" id="logo-trigger">
-                <div class="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg group-hover:rotate-12 transition-transform">
-                    <i data-lucide="bot" class="text-white w-5 h-5"></i>
+                <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200 group-hover:rotate-12 transition-transform">
+                    <i data-lucide="bot" class="text-white w-6 h-6"></i>
                 </div>
-                <span class="font-black text-xl tracking-tighter text-slate-900">AI러키봇</span>
+                <span class="font-black text-2xl tracking-tighter text-slate-900">AI러키봇</span>
             </div>
-            <a href="#contact" class="bg-brand-dark text-white px-6 py-2.5 rounded-full text-xs font-black hover:bg-slate-700 transition-all">상담신청</a>
+            <a href="#contact" class="bg-slate-900 text-white px-6 py-3 rounded-full text-xs font-black hover:bg-slate-700 transition-all shadow-lg">상담신청</a>
         </div>
     </header>
 
-    <section class="hero-bg pt-40 pb-20 px-6 text-center">
-        <div class="max-w-4xl mx-auto space-y-6">
-            <div class="inline-block px-4 py-1.5 bg-orange-100 text-brand-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">Smart Serving Solution</div>
-            <h1 class="text-5xl md:text-7xl font-black leading-tight tracking-tighter text-slate-900">
+    <section class="hero-bg pt-48 pb-24 px-6 text-center">
+        <div class="max-w-4xl mx-auto space-y-8">
+            <div class="inline-flex items-center gap-2 px-4 py-2 bg-orange-50 text-brand-600 rounded-full text-[11px] font-black uppercase tracking-widest mx-auto">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+                </span>
+                매장의 행운, AI 서빙 솔루션
+            </div>
+            <h1 class="text-6xl md:text-8xl font-black leading-tight tracking-tighter text-slate-900">
                 가장 완벽한 서빙,<br><span class="text-brand-500">러키봇</span>과 함께
             </h1>
-            <p class="text-slate-400 text-lg font-medium">복잡한 설정 없이 바로 시작하세요. 매장의 효율을 높여드립니다.</p>
+            <p class="text-slate-400 text-xl font-medium max-w-2xl mx-auto">복잡한 설정 없이 바로 시작하세요. 스마트한 서빙으로 매장의 효율을 극대화합니다.</p>
         </div>
     </section>
 
-    <section class="py-16 px-6 bg-white">
-        <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
-            <div class="p-10 rounded-[40px] bg-slate-50 border border-slate-100">
-                <h3 class="text-2xl font-black mb-2">러키봇 실속형</h3>
-                <p class="text-3xl font-black text-brand-500 mb-6">299,000 <span class="text-sm text-slate-400 font-bold">원/월</span></p>
-                <ul class="space-y-3 text-slate-500 font-bold text-sm">
-                    <li>• 전문가 정밀 검수 완료</li>
-                    <li>• 신품급 외관 및 성능</li>
+    <section class="py-20 px-6 bg-white">
+        <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-10">
+            <div class="p-12 rounded-[48px] bg-slate-50 border border-slate-100 floating-card">
+                <div class="text-[10px] font-black text-brand-500 mb-4 uppercase tracking-widest">리퍼비시 특가</div>
+                <h3 class="text-3xl font-black mb-2 text-slate-900">러키봇 실속형</h3>
+                <p class="text-4xl font-black text-brand-500 mb-8">299,000 <span class="text-sm text-slate-400 font-bold">원/월</span></p>
+                <ul class="space-y-4 text-slate-500 font-bold text-base">
+                    <li class="flex items-center gap-3"><i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500"></i> 전문가 정밀 검수 완료</li>
+                    <li class="flex items-center gap-3"><i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500"></i> 신품급 외관 및 성능</li>
                 </ul>
             </div>
-            <div class="p-10 rounded-[40px] bg-slate-900 text-white shadow-2xl">
-                <h3 class="text-2xl font-black mb-2">러키봇 신품</h3>
-                <p class="text-3xl font-black text-brand-500 mb-6">399,000 <span class="text-sm text-slate-400 font-bold">원/월</span></p>
-                <ul class="space-y-3 opacity-80 font-bold text-sm">
-                    <li>• 최신형 3D LiDAR 탑재</li>
-                    <li>• 대용량 배터리 시스템</li>
+            <div class="p-12 rounded-[48px] bg-slate-900 text-white shadow-2xl floating-card overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-8 opacity-10">
+                    <i data-lucide="sparkles" class="w-32 h-32"></i>
+                </div>
+                <div class="text-[10px] font-black text-brand-500 mb-4 uppercase tracking-widest">BEST CHOICE</div>
+                <h3 class="text-3xl font-black mb-2">러키봇 신품</h3>
+                <p class="text-4xl font-black text-brand-500 mb-8">399,000 <span class="text-sm text-slate-400 font-bold">원/월</span></p>
+                <ul class="space-y-4 opacity-80 font-bold text-base">
+                    <li class="flex items-center gap-3"><i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500"></i> 최신형 3D LiDAR 센서 탑재</li>
+                    <li class="flex items-center gap-3"><i data-lucide="check-circle-2" class="w-5 h-5 text-brand-500"></i> 대용량 배터리 시스템</li>
                 </ul>
             </div>
         </div>
     </section>
 
-    <section id="contact" class="py-24 px-6 bg-slate-50">
-        <div class="max-w-md mx-auto bg-white p-10 rounded-[48px] shadow-2xl border border-slate-100">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-black mb-2">무료 상담</h2>
-                <p class="text-slate-400 text-sm font-bold">빠르게 안내 도와드리겠습니다.</p>
+    <section id="contact" class="py-32 px-6 bg-slate-50/50">
+        <div class="max-w-lg mx-auto bg-white p-12 rounded-[56px] shadow-2xl border border-slate-100 text-center">
+            <div class="mb-10">
+                <h2 class="text-4xl font-black mb-3 text-slate-900">무료 상담</h2>
+                <p class="text-slate-400 text-base font-bold">정보를 남겨주시면 전문가가 연락드립니다.</p>
             </div>
-            <!-- Form에 직접적인 action을 제거하여 페이지 이동 방지 -->
-            <form id="consultation-form" onsubmit="return false;" class="space-y-4">
-                <input type="text" id="user-name" placeholder="매장명 또는 성함" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all" required>
-                <input type="tel" id="user-phone" placeholder="연락처 (010-0000-0000)" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all" required>
-                <button type="button" id="submit-btn" disabled class="w-full bg-brand-500 text-white py-5 rounded-3xl font-black text-lg shadow-xl hover:bg-brand-600 active:scale-95 transition-all disabled:bg-slate-300">연결 중...</button>
+            <form id="consultation-form" onsubmit="return false;" class="space-y-5">
+                <div class="text-left">
+                    <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase tracking-widest">매장명 또는 성함</label>
+                    <input type="text" id="user-name" placeholder="ㅇㅇㅇ" class="w-full bg-slate-50 rounded-[28px] px-8 py-5 text-base font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all" required>
+                </div>
+                <div class="text-left">
+                    <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase tracking-widest">연락처</label>
+                    <input type="tel" id="user-phone" placeholder="01012345678" class="w-full bg-slate-50 rounded-[28px] px-8 py-5 text-base font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all" required>
+                </div>
+                <button type="button" id="submit-btn" class="w-full bg-brand-500 text-white py-6 rounded-[32px] font-black text-xl shadow-xl shadow-orange-200 hover:bg-brand-600 active:scale-95 transition-all mt-4">신청하기</button>
             </form>
         </div>
     </section>
 
     <div id="admin-panel" class="bg-white">
-        <div class="bg-slate-900 p-4 flex justify-between items-center text-white">
-            <span class="font-black text-[10px] uppercase tracking-widest">실시간 접수 목록 (<span id="submission-count">0</span>)</span>
-            <button id="admin-close" class="hover:text-brand-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+        <div class="bg-slate-900 p-5 flex justify-between items-center text-white">
+            <span class="font-black text-[11px] uppercase tracking-widest">실시간 접수 현황 (<span id="submission-count">0</span>)</span>
+            <button id="admin-close" class="hover:text-brand-500 transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
         </div>
-        <div id="admin-list" class="max-h-[350px] overflow-y-auto"></div>
+        <div id="admin-list" class="max-h-[400px] overflow-y-auto"></div>
     </div>
 
-    <footer class="py-12 text-center text-slate-300 text-[10px] font-black uppercase tracking-[0.3em]">
-        &copy; 2026 AI Lucky Bot Inc.
+    <footer class="py-16 text-center text-slate-300 text-[11px] font-black uppercase tracking-[0.4em]">
+        &copy; 2026 AI LUCKY BOT. ALL RIGHTS RESERVED.
     </footer>
 
     <script>
         lucide.createIcons();
 
-        // 관리자 모드 트리거 (로고 3번 클릭)
+        // 관리자 모드 트리거
         let clickCount = 0;
         document.getElementById('logo-trigger').addEventListener('click', () => {
             clickCount++;
@@ -193,18 +213,16 @@
             document.getElementById('admin-panel').classList.remove('active');
         });
 
-        // 상담 신청 로직 (더욱 견고한 이벤트 처리)
+        // 상담 신청 로직
         const submitBtn = document.getElementById('submit-btn');
         submitBtn.addEventListener('click', async (e) => {
-            // 버튼 클릭 시의 기본 동작 및 전파 방지
             e.preventDefault();
-            e.stopPropagation();
-
+            
             const name = document.getElementById('user-name').value.trim();
             const phone = document.getElementById('user-phone').value.trim();
 
             if (!name || !phone) {
-                alert('모든 정보를 입력해주세요.');
+                alert('이름과 연락처를 모두 입력해주세요.');
                 return;
             }
 
@@ -212,7 +230,9 @@
             submitBtn.innerText = "전송 중...";
 
             try {
-                if (!window.fbUtils) throw new Error("Firebase not ready");
+                if (!window.fbUtils) {
+                    throw new Error("연결 준비 중입니다. 잠시만 기다려주세요.");
+                }
 
                 const { db, appId, collection, addDoc, serverTimestamp } = window.fbUtils;
                 
@@ -222,12 +242,11 @@
                     createdAt: serverTimestamp()
                 });
 
-                // 성공 메시지
-                alert('✅ 상담 신청이 정상적으로 접수되었습니다!\n담당자가 곧 연락드리겠습니다.');
+                alert('상담 신청이 완료되었습니다. 담당자가 곧 연락드리겠습니다.');
                 document.getElementById('consultation-form').reset();
             } catch (err) {
-                console.error("Submission Error:", err);
-                alert('❌ 전송에 실패했습니다. 네트워크 상태를 확인해주세요.');
+                console.error(err);
+                alert(err.message || '오류가 발생했습니다. 다시 시도해주세요.');
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerText = "신청하기";
