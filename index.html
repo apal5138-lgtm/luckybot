@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI러키봇 - 행운을 서빙하는 Smart AI 로봇</title>
+    <title>AI러키봇 - 행운을 서빙하는 스마트 로봇</title>
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    
+    <!-- 라이브러리: Tailwind CSS & Lucide Icons -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
     <script>
         tailwind.config = {
             theme: {
@@ -18,7 +18,6 @@
                     colors: {
                         brand: {
                             50: '#fff7ed',   
-                            100: '#ffedd5',
                             500: '#f97316',
                             600: '#ea580c',
                             dark: '#1e293b'
@@ -29,9 +28,7 @@
         }
     </script>
 
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Firebase SDK -->
+    <!-- Firebase 실시간 데이터베이스 설정 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -41,346 +38,228 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v2';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v5';
 
-        window.db = db;
-        window.auth = auth;
+        // 전역 변수 설정
+        window.db = db; 
+        window.auth = auth; 
         window.appId = appId;
-        window.collection = collection;
+        window.collection = collection; 
         window.addDoc = addDoc;
-        window.onSnapshot = onSnapshot;
+        window.onSnapshot = onSnapshot; 
         window.serverTimestamp = serverTimestamp;
 
-        const initApp = async () => {
+        const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
-                onAuthStateChanged(auth, (user) => { if (user) startRealtimeSync(); });
             } catch (error) {
-                console.error("Auth failed:", error);
+                console.error("인증 오류:", error);
             }
         };
 
-        function startRealtimeSync() {
+        // 인증 상태 변경 감지 후 리스너 설정
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupRealtimeListener();
+            }
+        });
+
+        function setupRealtimeListener() {
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
+            
             onSnapshot(q, (snapshot) => {
-                const listContainer = document.getElementById('admin-list');
-                const countBadge = document.getElementById('submission-count');
+                const list = document.getElementById('admin-list');
+                const badge = document.getElementById('submission-count');
                 const docs = [];
                 snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+                
+                // 최신순 정렬
                 docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                countBadge.innerText = docs.length;
-                listContainer.innerHTML = docs.map(doc => `
-                    <div class="p-4 border-b border-slate-50 flex justify-between items-center bg-white hover:bg-slate-50">
+                
+                badge.innerText = docs.length;
+                list.innerHTML = docs.map(doc => `
+                    <div class="p-4 border-b border-slate-50 flex justify-between items-center bg-white hover:bg-orange-50 transition-colors text-left">
                         <div>
-                            <p class="font-bold text-slate-800">${doc.name}</p>
-                            <p class="text-xs text-slate-500">${doc.phone}</p>
+                            <p class="font-black text-slate-800 text-sm">${doc.name}</p>
+                            <p class="text-xs text-brand-500 font-mono mt-0.5">${doc.phone}</p>
                         </div>
-                        <p class="text-[10px] text-slate-300">${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleTimeString() : '방금'}</p>
+                        <p class="text-[9px] text-slate-300 font-bold uppercase">
+                            ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '방금 접수'}
+                        </p>
                     </div>
-                `).join('') || '<p class="p-10 text-center text-slate-400">접수된 상담이 없습니다.</p>';
+                `).join('') || '<p class="p-12 text-center text-slate-400 text-xs italic">상담 내역이 없습니다.</p>';
+            }, (error) => {
+                console.error("Firestore 오류:", error);
             });
         }
-        initApp();
+
+        initAuth();
     </script>
 
     <style>
         html { scroll-behavior: smooth; }
-        .hero-gradient { background: linear-gradient(180deg, #FFF9F3 0%, #FFFFFF 100%); }
-        .card-shadow { box-shadow: 0 20px 50px rgba(0,0,0,0.05); }
-        .best-shadow { box-shadow: 0 30px 60px rgba(249, 115, 22, 0.15); }
-        .btn-hover { transition: all 0.3s ease; }
-        .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.1); }
-        #admin-panel { display: none; }
+        .hero-bg { background: linear-gradient(180deg, #FFF9F3 0%, #FFFFFF 100%); }
+        .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); transition: all 0.3s; }
+        #admin-panel { display: none; position: fixed; bottom: 90px; right: 25px; width: 340px; z-index: 1000; }
         #admin-panel.active { display: block; }
     </style>
 </head>
 <body class="font-sans text-slate-800">
 
     <!-- 네비게이션 -->
-    <header class="fixed w-full bg-white/70 backdrop-blur-md z-50 border-b border-slate-100">
-        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+    <header class="fixed w-full bg-white/90 backdrop-blur-md z-50 border-b border-slate-100 h-16 flex items-center px-6">
+        <div class="max-w-6xl mx-auto w-full flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-                    <i data-lucide="bot" class="text-white w-5 h-5"></i>
-                </div>
-                <span class="font-black text-xl text-slate-800 tracking-tight">AI러키봇</span>
+                <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-lg"><i data-lucide="bot" class="text-white w-5 h-5"></i></div>
+                <span class="font-black text-xl tracking-tighter text-slate-900">AI러키봇</span>
             </div>
-            <nav class="hidden md:flex gap-8 text-sm font-bold text-slate-500">
-                <a href="#home" class="hover:text-brand-500">홈</a>
-                <a href="#tech" class="hover:text-brand-500">기술력</a>
-                <a href="#models" class="hover:text-brand-500">요금안내</a>
-                <a href="#contact" class="hover:text-brand-500">문의하기</a>
-                <button onclick="toggleAdmin()" class="opacity-10 hover:opacity-100">Admin</button>
-            </nav>
-            <a href="#contact" class="bg-brand-500 text-white px-5 py-2 rounded-full text-sm font-bold btn-hover">도입 문의</a>
+            <div class="flex items-center gap-6">
+                <a href="#models" class="hidden md:block text-sm font-bold text-slate-500 hover:text-brand-500">요금제</a>
+                <a href="#contact" class="bg-brand-dark text-white px-5 py-2 rounded-full text-xs font-black btn-hover shadow-lg">상담신청</a>
+            </div>
         </div>
     </header>
 
-    <!-- 히어로 섹션 -->
-    <section id="home" class="hero-gradient pt-40 pb-20 px-6">
-        <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center gap-10">
-            <div class="flex-1 space-y-6 text-center md:text-left">
-                <div class="inline-flex items-center gap-2 text-brand-500 font-bold text-xs uppercase tracking-widest">
-                    <span class="w-2 h-2 bg-brand-500 rounded-full animate-pulse"></span>
-                    Best Serving Partner
-                </div>
-                <h1 class="text-4xl md:text-6xl font-black text-slate-900 leading-tight">
-                    행운을 서빙하는<br>
-                    <span class="text-brand-500 italic">Smart AI</span> 로봇
-                </h1>
-                <p class="text-slate-500 text-lg font-medium leading-relaxed">
-                    매장의 효율은 높이고 고객의 만족은 더합니다.<br>
-                    가장 합리적인 가격으로 차세대 서빙 로봇을 도입하세요.
-                </p>
-                <div class="flex flex-wrap gap-4 justify-center md:justify-start">
-                    <a href="#models" class="bg-brand-dark text-white px-8 py-4 rounded-xl font-bold btn-hover">요금제 확인하기</a>
-                    <a href="#contact" class="bg-white text-brand-500 border border-brand-500 px-8 py-4 rounded-xl font-bold btn-hover">무료 시연 신청</a>
-                </div>
+    <!-- 메인 비주얼 -->
+    <section id="home" class="hero-bg pt-40 pb-20 px-6 text-center">
+        <div class="max-w-4xl mx-auto space-y-8">
+            <div class="inline-flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-orange-100 text-brand-500 font-bold text-[10px] uppercase tracking-widest">
+                <span class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-ping"></span> Smart Serving Solution
             </div>
-            <div class="flex-1 flex justify-center">
-                <div class="relative w-64 h-[440px] bg-white rounded-[50px] shadow-2xl border-[8px] border-slate-50 p-8 flex flex-col items-center">
-                    <div class="w-12 h-1 bg-slate-100 rounded-full mb-12"></div>
-                    <div class="w-32 h-32 bg-brand-50 rounded-full flex items-center justify-center mb-8">
-                        <i data-lucide="bot" class="w-16 h-16 text-brand-500"></i>
-                    </div>
-                    <div class="text-center">
-                        <h3 class="font-black text-2xl">LUCKY V2</h3>
-                        <p class="text-[10px] text-brand-500 font-bold tracking-widest uppercase">Premium Edition</p>
-                    </div>
-                    <div class="mt-auto w-full">
-                        <div class="flex justify-between text-[8px] font-bold text-slate-400 mb-1">
-                            <span>OPERATING RATE</span>
-                            <span>98%</span>
-                        </div>
-                        <div class="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="bg-brand-500 h-full w-[98%]"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h1 class="text-5xl md:text-7xl font-black leading-tight tracking-tight text-slate-900">
+                행운을 서빙하는<br><span class="text-brand-500">AI러키봇</span>
+            </h1>
+            <p class="text-slate-500 text-lg font-medium italic">월 29만원대로 매장의 품격을 높이세요.</p>
         </div>
     </section>
 
-    <!-- 요금 섹션 -->
+    <!-- 요금 안내 -->
     <section id="models" class="py-24 px-6 bg-white">
-        <div class="max-w-5xl mx-auto text-center mb-16">
-            <h2 class="text-3xl font-black text-slate-900 mb-4">로봇 상품 가이드</h2>
-            <p class="text-slate-400 text-sm">매장 환경과 예산에 맞춘 다양한 라인업과 합리적인 요금제</p>
-            <div class="w-10 h-1 bg-brand-500 mx-auto mt-4 rounded-full"></div>
-        </div>
-
         <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-            <!-- 요금제 카드 1 -->
-            <div class="bg-white rounded-[40px] p-8 border border-slate-100 card-shadow flex flex-col">
-                <div class="mb-6">
-                    <span class="text-[10px] font-black text-slate-400 uppercase bg-slate-50 px-3 py-1 rounded-full">Economy Choice</span>
-                    <h3 class="text-xl font-black mt-4">러키봇 (A 급리퍼)</h3>
-                    <p class="text-slate-400 text-xs mt-1">알뜰한 성능과 합리적인 가격대</p>
+            <!-- 리퍼 요금제 -->
+            <div class="bg-slate-50 p-8 rounded-[40px] border border-slate-100 flex flex-col">
+                <span class="text-[10px] font-bold text-slate-400 mb-4 bg-white w-fit px-3 py-1 rounded-full">실속형</span>
+                <h3 class="text-xl font-black mb-6">러키봇 (리퍼)</h3>
+                <div class="mb-10">
+                    <span class="text-4xl font-black text-brand-500">299,000</span><span class="text-sm font-bold ml-1 text-slate-400">원/월</span>
                 </div>
-                <div class="bg-brand-50 rounded-3xl p-6 mb-8">
-                    <p class="text-[10px] font-bold text-brand-500 mb-1">36개월 렌탈(반납형)</p>
-                    <div class="flex items-baseline">
-                        <span class="text-3xl font-black text-brand-500">299,000</span>
-                        <span class="text-xs font-bold text-brand-500">원/월</span>
-                    </div>
-                    <p class="text-[9px] text-brand-200 mt-1">* VAT 별도 기준</p>
-                </div>
-                <ul class="space-y-3 mb-10 text-xs font-medium text-slate-500 flex-grow">
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 일시불가: 950만원</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 단말기(A): 20.0만/월</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 서비스(B): 19.9만/월</li>
-                    <li class="flex gap-2 font-bold text-brand-500"><i data-lucide="minus" class="w-4 h-4"></i> 할인(C): -10.0만/월</li>
+                <ul class="space-y-4 text-xs font-bold text-slate-500 mb-8">
+                    <li class="flex justify-between border-b border-slate-200 pb-2"><span>일시불가</span><span class="text-slate-900">950만원</span></li>
+                    <li class="flex justify-between text-brand-600"><span>결합 할인</span><span>최대 -10만원</span></li>
                 </ul>
-                <a href="#contact" class="w-full py-4 bg-slate-50 rounded-2xl text-slate-400 font-bold text-sm text-center btn-hover">상세 제안서 요청</a>
             </div>
-
-            <!-- 요금제 카드 2 (BEST) -->
-            <div class="bg-white rounded-[40px] p-8 border-2 border-brand-500 best-shadow flex flex-col relative">
-                <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-brand-500 text-white px-6 py-1 rounded-full text-[10px] font-black tracking-widest">BEST SELLER</div>
-                <div class="mb-6">
-                    <span class="text-[10px] font-black text-brand-500 uppercase bg-brand-50 px-3 py-1 rounded-full">Recommended</span>
-                    <h3 class="text-xl font-black mt-4">러키봇 (신품)</h3>
-                    <p class="text-slate-400 text-xs mt-1">가장 보편적 서빙의 표준</p>
+            <!-- 신품 요금제 -->
+            <div class="bg-brand-500 p-8 rounded-[40px] shadow-2xl text-white flex flex-col scale-105 z-10">
+                <span class="text-[10px] font-bold text-orange-200 mb-4 bg-brand-600 w-fit px-3 py-1 rounded-full uppercase">인기 모델</span>
+                <h3 class="text-xl font-black mb-6">러키봇 (신품)</h3>
+                <div class="mb-10 text-white">
+                    <span class="text-4xl font-black">399,000</span><span class="text-sm font-bold ml-1 opacity-70">원/월</span>
                 </div>
-                <div class="bg-brand-500 rounded-3xl p-6 mb-8 text-white">
-                    <p class="text-[10px] font-bold opacity-80 mb-1">36개월 렌탈(반납형)</p>
-                    <div class="flex items-baseline">
-                        <span class="text-3xl font-black">399,000</span>
-                        <span class="text-xs font-bold ml-1">원/월</span>
-                    </div>
-                    <p class="text-[9px] opacity-60 mt-1">* VAT 별도 기준</p>
-                </div>
-                <ul class="space-y-3 mb-10 text-xs font-bold text-slate-700 flex-grow">
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 일시불가: 1,180만원</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 단말기(A): 35.0만/월</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 서비스(B): 19.9만/월</li>
-                    <li class="flex gap-2 text-brand-500"><i data-lucide="minus" class="w-4 h-4"></i> 할인(C): -15.0만/월</li>
+                <ul class="space-y-4 text-xs font-bold mb-8">
+                    <li class="flex justify-between border-b border-orange-400 pb-2"><span>일시불가</span><span class="font-black">1,180만원</span></li>
+                    <li class="flex justify-between"><span>결합 할인</span><span>최대 -15만원</span></li>
                 </ul>
-                <a href="#contact" class="w-full py-4 bg-brand-500 text-white rounded-2xl font-bold text-sm text-center btn-hover">지금 바로 도입하기</a>
             </div>
-
-            <!-- 요금제 카드 3 -->
-            <div class="bg-white rounded-[40px] p-8 border border-slate-100 card-shadow flex flex-col">
-                <div class="mb-6">
-                    <span class="text-[10px] font-black text-white uppercase bg-brand-dark px-3 py-1 rounded-full">Premium</span>
-                    <h3 class="text-xl font-black mt-4">러키봇 프로 (신품)</h3>
-                    <p class="text-slate-400 text-xs mt-1">최고의 성능을 원하는 매장용</p>
+            <!-- 프로 요금제 -->
+            <div class="bg-slate-900 p-8 rounded-[40px] text-white flex flex-col">
+                <span class="text-[10px] font-bold text-slate-500 mb-4 bg-slate-800 w-fit px-3 py-1 rounded-full">프리미엄</span>
+                <h3 class="text-xl font-black mb-6">러키봇 프로</h3>
+                <div class="mb-10">
+                    <span class="text-4xl font-black">499,000</span><span class="text-sm font-bold ml-1 text-slate-500">원/월</span>
                 </div>
-                <div class="bg-brand-dark rounded-3xl p-6 mb-8 text-white">
-                    <p class="text-[10px] font-bold opacity-60 mb-1">36개월 렌탈(반납형)</p>
-                    <div class="flex items-baseline">
-                        <span class="text-3xl font-black">499,000</span>
-                        <span class="text-xs font-bold ml-1">원/월</span>
-                    </div>
-                    <p class="text-[9px] opacity-40 mt-1">* VAT 별도 기준</p>
-                </div>
-                <ul class="space-y-3 mb-10 text-xs font-medium text-slate-500 flex-grow">
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 일시불가: 1,540만원</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 단말기(A): 50.0만/월</li>
-                    <li class="flex gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 서비스(B): 19.9만/월</li>
-                    <li class="flex gap-2 font-bold text-brand-500"><i data-lucide="minus" class="w-4 h-4"></i> 할인(C): -20.0만/월</li>
+                <ul class="space-y-4 text-xs font-bold text-slate-400 mb-8">
+                    <li class="flex justify-between border-b border-slate-800 pb-2"><span>일시불가</span><span class="text-white">1,540만원</span></li>
+                    <li class="flex justify-between text-brand-500"><span>결합 할인</span><span>최대 -20만원</span></li>
                 </ul>
-                <a href="#contact" class="w-full py-4 bg-slate-50 rounded-2xl text-slate-400 font-bold text-sm text-center btn-hover">VIP 상담 신청</a>
-            </div>
-        </div>
-
-        <!-- 추가 서비스 섹션 -->
-        <div class="max-w-4xl mx-auto grid md:grid-cols-2 gap-6 mt-16">
-            <div class="bg-white rounded-3xl p-6 border border-slate-100 flex items-center justify-between card-shadow">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                        <i data-lucide="bell-ring" class="text-brand-500 w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h4 class="font-black text-sm text-slate-800">스마트 호출벨</h4>
-                        <p class="text-[10px] text-slate-400">위생적 무선 호출 시스템</p>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <p class="text-brand-500 font-black text-lg leading-none">월 3만원</p>
-                    <p class="text-[8px] text-slate-300 font-bold mt-1">36개월 약정형</p>
-                </div>
-            </div>
-            <div class="bg-white rounded-3xl p-6 border border-slate-100 flex items-center justify-between card-shadow">
-                <div class="flex items-center gap-4">
-                    <div class="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                        <i data-lucide="wrench" class="text-brand-500 w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h4 class="font-black text-sm text-slate-800">유지보수 서비스</h4>
-                        <p class="text-[10px] text-slate-400">24시간 이내 현장 대응 케어</p>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <p class="text-brand-500 font-black text-lg leading-none">월 9.9만원</p>
-                    <p class="text-[8px] text-slate-300 font-bold mt-1">12개월 약정 기준</p>
-                </div>
             </div>
         </div>
     </section>
 
-    <!-- 상담 신청 섹션 -->
-    <section id="contact" class="py-24 px-6">
-        <div class="max-w-4xl mx-auto">
-            <div class="bg-brand-500 rounded-[50px] p-10 md:p-16 text-center text-white relative overflow-hidden shadow-2xl">
-                <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-                <div class="relative z-10">
-                    <h2 class="text-3xl md:text-4xl font-black mb-4">우리 매장도<br>러키해질 수 있을까요?</h2>
-                    <p class="text-orange-100 text-sm font-medium mb-10">전문 컨설턴트가 24시간 내에 매장 규모에 맞는 견적을 안내해 드립니다.</p>
-                    
-                    <form id="consultation-form" class="max-w-md mx-auto space-y-4">
-                        <input type="text" id="user-name" placeholder="성함 또는 매장명" class="w-full bg-white rounded-xl px-6 py-4 text-slate-900 font-bold outline-none border-none placeholder:text-slate-300 shadow-lg" required>
-                        <input type="tel" id="user-phone" placeholder="연락처 (010-0000-0000)" class="w-full bg-white rounded-xl px-6 py-4 text-slate-900 font-bold outline-none border-none placeholder:text-slate-300 shadow-lg" required>
-                        <button type="submit" id="submit-btn" class="w-full bg-brand-dark text-white py-4 rounded-xl font-black text-lg btn-hover shadow-xl flex items-center justify-center gap-3">
-                            <span id="btn-text">지금 무료 상담 받기</span>
-                            <div id="loading-spinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        </button>
-                    </form>
-                    <p class="text-orange-200 text-[9px] mt-4 opacity-70">상담 신청 시 개인정보 수집 및 이용에 동의하는 것으로 간주됩니다.</p>
-                </div>
-            </div>
+    <!-- 상담 신청 폼 -->
+    <section id="contact" class="py-24 px-6 bg-slate-50">
+        <div class="max-w-md mx-auto bg-white p-10 rounded-[40px] shadow-2xl border border-slate-100">
+            <h2 class="text-2xl font-black text-center mb-8">무료 체험 신청</h2>
+            <form id="consultation-form" class="space-y-4">
+                <input type="text" id="user-name" placeholder="매장명 또는 성함" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold border-none outline-brand-500 focus:bg-white transition-all" required>
+                <input type="tel" id="user-phone" placeholder="연락처 (010-0000-0000)" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold border-none outline-brand-500 focus:bg-white transition-all" required>
+                <button type="submit" id="submit-btn" class="w-full bg-brand-500 text-white py-5 rounded-2xl font-black text-lg btn-hover shadow-xl flex items-center justify-center gap-3">
+                    <span id="btn-text">신청하기</span>
+                    <div id="loading" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </button>
+            </form>
         </div>
     </section>
 
-    <!-- 관리자 패널 -->
-    <section id="admin-panel" class="py-10 px-6 bg-slate-50">
-        <div class="max-w-xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-            <div class="bg-brand-dark p-4 flex justify-between items-center">
-                <h3 class="text-white font-black text-sm flex items-center gap-2"><i data-lucide="database" class="w-4 h-4"></i> 상담 접수 현황</h3>
-                <span id="submission-count" class="bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">0</span>
+    <!-- 관리자 대시보드 UI -->
+    <div id="admin-panel" class="bg-white shadow-2xl rounded-3xl overflow-hidden border border-slate-200">
+        <div class="bg-slate-900 p-4 flex justify-between items-center text-white">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span class="font-bold text-[10px] uppercase">Real-time Admin</span>
             </div>
-            <div id="admin-list" class="max-h-60 overflow-y-auto divide-y divide-slate-50">
-                <p class="p-8 text-center text-slate-300 text-xs">데이터 로드 중...</p>
+            <div class="flex items-center gap-3">
+                <span id="submission-count" class="bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">0</span>
+                <button onclick="toggleAdmin()" class="text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
         </div>
-    </section>
+        <div id="admin-list" class="max-h-[400px] overflow-y-auto divide-y divide-slate-50 bg-white">
+            <p class="p-12 text-center text-slate-400 text-xs italic">데이터 확인 중...</p>
+        </div>
+    </div>
 
-    <!-- 푸터 -->
-    <footer class="bg-white py-16 px-6 border-t border-slate-50">
-        <div class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
-            <div class="space-y-4">
-                <div class="flex items-center justify-center md:justify-start gap-2">
-                    <div class="w-6 h-6 bg-brand-500 rounded flex items-center justify-center">
-                        <i data-lucide="bot" class="text-white w-4 h-4"></i>
-                    </div>
-                    <span class="font-black text-lg">AI러키봇</span>
-                </div>
-                <p class="text-slate-400 text-[10px] leading-relaxed max-w-xs">행운을 서빙하는 스마트 매장 파트너, AI러키봇과 함께 비즈니스의 새로운 미래를 설계하세요.</p>
-            </div>
-            <div class="text-[10px] text-slate-300 leading-loose">
-                <p class="font-bold text-slate-500">(주)AI러키봇 코리아</p>
-                <p>서울특별시 강남구 테헤란로 스마트타워 24층</p>
-                <p>대표번호: 1588-XXXX | support@luckybot.ai</p>
-                <p class="mt-2">Copyright © 2026 AI LuckyBot. All rights reserved.</p>
-            </div>
-        </div>
+    <!-- 플로팅 관리 버튼 -->
+    <button onclick="toggleAdmin()" class="fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center border border-slate-100 text-slate-400 hover:text-brand-500 transition-all z-[999]">
+        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+    </button>
+
+    <footer class="py-12 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+        &copy; 2026 AI Lucky Bot. All Rights Reserved.
     </footer>
 
     <script>
         lucide.createIcons();
+        
+        function toggleAdmin() { 
+            document.getElementById('admin-panel').classList.toggle('active'); 
+        }
 
-        const form = document.getElementById('consultation-form');
-        const submitBtn = document.getElementById('submit-btn');
-        const btnText = document.getElementById('btn-text');
-        const spinner = document.getElementById('loading-spinner');
-
-        form.addEventListener('submit', async (e) => {
+        document.getElementById('consultation-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             if (!window.auth.currentUser) {
-                alert('연결 준비 중입니다. 잠시만 기다려주세요.');
+                alert('잠시만 기다려주세요 (인증 중)');
                 return;
             }
 
-            const name = document.getElementById('user-name').value;
-            const phone = document.getElementById('user-phone').value;
-
-            submitBtn.disabled = true;
-            btnText.innerText = "처리 중...";
-            spinner.classList.remove('hidden');
+            const btn = document.getElementById('submit-btn');
+            const txt = document.getElementById('btn-text');
+            const loader = document.getElementById('loading');
+            
+            btn.disabled = true; 
+            txt.innerText = "처리 중..."; 
+            loader.classList.remove('hidden');
 
             try {
                 await window.addDoc(window.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'consultations'), {
-                    name, phone, createdAt: window.serverTimestamp()
+                    name: document.getElementById('user-name').value,
+                    phone: document.getElementById('user-phone').value,
+                    createdAt: window.serverTimestamp()
                 });
-                alert('상담 신청이 정상적으로 완료되었습니다!');
-                form.reset();
-            } catch (error) {
-                console.error("Save error:", error);
-                alert('저장 중 오류가 발생했습니다.');
-            } finally {
-                submitBtn.disabled = false;
-                btnText.innerText = "지금 무료 상담 받기";
-                spinner.classList.add('hidden');
+                
+                document.getElementById('consultation-form').reset();
+                document.getElementById('admin-panel').classList.add('active');
+            } catch (err) { 
+                alert('오류가 발생했습니다.'); 
+            } finally { 
+                btn.disabled = false; 
+                txt.innerText = "신청하기"; 
+                loader.classList.add('hidden'); 
             }
         });
-
-        function toggleAdmin() {
-            document.getElementById('admin-panel').classList.toggle('active');
-        }
     </script>
 </body>
 </html>
