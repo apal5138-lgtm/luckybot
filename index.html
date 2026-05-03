@@ -37,9 +37,6 @@
             border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* 버튼 비활성화 스타일 */
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body class="font-sans text-slate-900 overflow-x-hidden">
@@ -78,6 +75,7 @@
     <!-- Products -->
     <section id="products" class="py-20 px-6 max-w-7xl mx-auto">
         <div class="grid md:grid-cols-3 gap-8">
+            <!-- 리퍼비시 -->
             <div class="product-card bg-slate-50/50 p-10 border border-slate-100 flex flex-col">
                 <span class="text-[10px] font-black text-slate-400 uppercase mb-2">리퍼비시 특가</span>
                 <h3 class="text-2xl font-black mb-6">러키봇 실속형</h3>
@@ -94,6 +92,7 @@
                     <span class="text-xl font-black">950만원</span>
                 </div>
             </div>
+            <!-- 신품 -->
             <div class="product-card bg-brand-dark p-10 shadow-2xl shadow-slate-200 flex flex-col text-white">
                 <span class="text-[10px] font-black text-brand-500 uppercase mb-2">Best Choice</span>
                 <h3 class="text-2xl font-black mb-6">러키봇 신품</h3>
@@ -110,6 +109,7 @@
                     <span class="text-xl font-black">1,180만원</span>
                 </div>
             </div>
+            <!-- 프로 -->
             <div class="product-card bg-orange-500 p-10 shadow-2xl shadow-orange-100 flex flex-col text-white">
                 <span class="text-[10px] font-black text-orange-100 uppercase mb-2">Premium</span>
                 <h3 class="text-2xl font-black mb-6">러키봇 프로</h3>
@@ -144,11 +144,11 @@
                     <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase">연락처</label>
                     <input type="tel" id="phone" placeholder="010-0000-0000" class="w-full bg-slate-50 rounded-full px-8 py-5 font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all border-none">
                 </div>
-                <button id="submit-btn" disabled class="w-full bg-brand-500 text-white py-6 rounded-full font-black text-xl shadow-xl shadow-orange-100 hover:bg-brand-600 transition-all mt-6 flex items-center justify-center gap-3">
-                    <div class="loading-spinner" id="btn-spinner"></div>
-                    <span id="btn-text">연결 중...</span>
+                <button id="submit-btn" class="w-full bg-brand-500 text-white py-6 rounded-full font-black text-xl shadow-xl shadow-orange-100 hover:bg-brand-600 transition-all mt-6 flex items-center justify-center gap-3">
+                    <div class="loading-spinner hidden" id="btn-spinner"></div>
+                    <span id="btn-text">신청하기</span>
                 </button>
-                <p id="status-text" class="text-center text-xs font-bold text-slate-400 mt-4 opacity-0">상태 메시지</p>
+                <p id="status-text" class="text-center text-xs font-bold text-slate-400 mt-4 opacity-0 transition-opacity">상태 메시지</p>
             </div>
         </div>
     </section>
@@ -174,11 +174,13 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Configuration
+        // Global Setup
         const firebaseConfig = JSON.parse(__firebase_config);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v11';
-        
-        let app, auth, db;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
         let currentUser = null;
         let isSubmitting = false;
 
@@ -187,76 +189,66 @@
         const btnText = document.getElementById('btn-text');
         const btnSpinner = document.getElementById('btn-spinner');
 
-        // Exponential Backoff Retry Function
-        const retry = async (fn, retries = 5, delay = 1000) => {
+        // Simple Fast Authentication
+        const startAuth = async () => {
             try {
-                return await fn();
-            } catch (err) {
-                if (retries <= 0) throw err;
-                await new Promise(r => setTimeout(r, delay));
-                return retry(fn, retries - 1, delay * 2);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Auth Error:", e);
+                // Fail silently and let the submission handle re-auth if needed
             }
         };
 
-        const initializeSite = async () => {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-
-                // Authentication with Retry (Rule 3)
-                await retry(async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                });
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        enableSubmitButton();
-                        startAdminListener();
-                    }
-                });
-
-            } catch (error) {
-                console.error("Initialization Failed:", error);
-                btnText.innerText = "연결 오류 (새로고침)";
-                statusText.innerText = "서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요.";
-                statusText.classList.add('text-red-500');
-                statusText.style.opacity = "1";
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                console.log("Auth Success:", user.uid);
+                startAdminListener();
             }
-        };
+        });
 
-        const enableSubmitButton = () => {
-            submitBtn.disabled = false;
-            btnSpinner.style.display = 'none';
-            btnText.innerText = "신청하기";
-        };
+        // Initialize immediately
+        startAuth();
 
         // Submit Action
         window.sendConsultation = async () => {
-            if (!currentUser || isSubmitting) return;
-
-            const name = document.getElementById('name').value.trim();
-            const phone = document.getElementById('phone').value.trim();
+            const nameInput = document.getElementById('name');
+            const phoneInput = document.getElementById('phone');
+            const name = nameInput.value.trim();
+            const phone = phoneInput.value.trim();
 
             if (!name || !phone) {
-                alert("상함과 연락처를 모두 입력해주세요.");
+                alert("성함과 연락처를 모두 입력해주세요.");
                 return;
+            }
+
+            if (isSubmitting) return;
+
+            // Ensure Auth
+            if (!currentUser) {
+                try {
+                    await startAuth();
+                    if (!auth.currentUser) throw new Error("인증 실패");
+                    currentUser = auth.currentUser;
+                } catch (err) {
+                    alert("서버 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
+                    return;
+                }
             }
 
             isSubmitting = true;
             submitBtn.disabled = true;
-            btnSpinner.style.display = 'block';
+            btnSpinner.classList.remove('hidden');
             btnText.innerText = "전송 중...";
             statusText.style.opacity = "1";
-            statusText.innerText = "상담 정보를 안전하게 보내고 있습니다.";
+            statusText.innerText = "상담 정보를 전송하고 있습니다.";
 
             try {
-                // Rule 1 & Rule 3 Guard
+                // Rule 1: Correct Path
                 const colPath = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
                 await addDoc(colPath, {
                     name,
@@ -266,17 +258,18 @@
                 });
 
                 // Success UI
-                btnSpinner.style.display = 'none';
+                btnSpinner.classList.add('hidden');
                 btnText.innerText = "신청 완료";
                 submitBtn.classList.replace('bg-brand-500', 'bg-green-500');
-                statusText.innerText = "정상적으로 접수되었습니다. 곧 연락드리겠습니다!";
+                statusText.innerText = "정상 접수되었습니다. 곧 연락드리겠습니다!";
                 
-                document.getElementById('name').value = "";
-                document.getElementById('phone').value = "";
+                nameInput.value = "";
+                phoneInput.value = "";
 
                 setTimeout(() => {
+                    submitBtn.disabled = false;
                     submitBtn.classList.replace('bg-green-500', 'bg-brand-500');
-                    enableSubmitButton();
+                    btnText.innerText = "신청하기";
                     statusText.style.opacity = "0";
                     isSubmitting = false;
                 }, 4000);
@@ -284,9 +277,10 @@
             } catch (error) {
                 console.error("Submit Error:", error);
                 isSubmitting = false;
-                enableSubmitButton();
+                submitBtn.disabled = false;
+                btnSpinner.classList.add('hidden');
                 btnText.innerText = "다시 시도";
-                statusText.innerText = "전송 실패: 권한 문제 또는 통신 장애가 발생했습니다.";
+                statusText.innerText = "권한 또는 네트워크 오류가 발생했습니다.";
                 statusText.classList.add('text-red-500');
             }
         };
@@ -300,34 +294,30 @@
                 const list = [];
                 snap.forEach(doc => list.push({id: doc.id, ...doc.data()}));
                 
-                // Rule 2: Client-side Sort
+                // Sort client-side
                 list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 
                 document.getElementById('admin-count').innerText = list.length;
                 
                 if (list.length === 0) {
-                    adminList.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">상담 내역이 아직 없습니다.</div>';
+                    adminList.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">내역이 없습니다.</div>';
                 } else {
                     adminList.innerHTML = list.map(item => `
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-brand-500 transition-colors">
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                             <div class="flex justify-between items-start mb-2">
-                                <span class="font-black text-slate-800">${item.name || '익명'}</span>
-                                <span class="text-[9px] text-slate-400 font-bold bg-slate-50 px-2 py-1 rounded">
+                                <span class="font-black text-slate-800">${item.name || '미입력'}</span>
+                                <span class="text-[9px] text-slate-400 font-bold">
                                     ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : '방금 전'}
                                 </span>
                             </div>
-                            <div class="text-brand-500 font-black text-lg tracking-tight">${item.phone || '-'}</div>
+                            <div class="text-brand-500 font-black text-lg">${item.phone || '-'}</div>
                         </div>
                     `).join('');
                 }
             }, (err) => {
                 console.error("Snapshot Error:", err);
-                adminList.innerHTML = '<div class="p-10 text-red-400 text-xs font-bold text-center">조회 권한이 제한되었습니다.</div>';
             });
         }
-
-        // Start initialization
-        initializeSite();
     </script>
 
     <script>
