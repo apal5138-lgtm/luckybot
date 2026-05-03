@@ -38,16 +38,10 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v5';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-final';
 
-        // 전역 변수 설정
-        window.db = db; 
-        window.auth = auth; 
-        window.appId = appId;
-        window.collection = collection; 
-        window.addDoc = addDoc;
-        window.onSnapshot = onSnapshot; 
-        window.serverTimestamp = serverTimestamp;
+        // 전역 객체에 할당 (접근성 보장)
+        window.firebase = { db, auth, appId, collection, addDoc, onSnapshot, serverTimestamp };
 
         const initAuth = async () => {
             try {
@@ -57,13 +51,13 @@
                     await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("인증 오류:", error);
+                console.error("인증 실패:", error);
             }
         };
 
-        // 인증 상태 변경 감지
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                console.log("인증 완료:", user.uid);
                 setupRealtimeListener();
             } else {
                 initAuth();
@@ -72,31 +66,27 @@
 
         function setupRealtimeListener() {
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
-            
             onSnapshot(q, (snapshot) => {
                 const list = document.getElementById('admin-list');
                 const badge = document.getElementById('submission-count');
                 const docs = [];
                 snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
                 
-                // 최신순 정렬
                 docs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 
                 badge.innerText = docs.length;
                 list.innerHTML = docs.map(doc => `
-                    <div class="p-4 border-b border-slate-50 flex justify-between items-center bg-white hover:bg-orange-50 transition-colors text-left">
-                        <div>
-                            <p class="font-black text-slate-800 text-sm">${doc.name || '이름 없음'}</p>
-                            <p class="text-xs text-brand-500 font-mono mt-0.5">${doc.phone || '번호 없음'}</p>
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white hover:bg-orange-50 transition-colors">
+                        <div class="text-left">
+                            <p class="font-bold text-slate-800 text-sm">${doc.name || '미입력'}</p>
+                            <p class="text-xs text-brand-500 font-mono">${doc.phone || '미입력'}</p>
                         </div>
-                        <p class="text-[9px] text-slate-300 font-bold uppercase">
-                            ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '방금 접수'}
+                        <p class="text-[10px] text-slate-400">
+                            ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleTimeString() : '방금'}
                         </p>
                     </div>
-                `).join('') || '<p class="p-12 text-center text-slate-400 text-xs italic">상담 내역이 없습니다.</p>';
-            }, (error) => {
-                console.error("Firestore 리스너 오류:", error);
-            });
+                `).join('') || '<p class="p-10 text-center text-slate-400 text-xs italic">접수된 내역이 없습니다.</p>';
+            }, (err) => console.error("Firestore Error:", err));
         }
 
         initAuth();
@@ -105,190 +95,135 @@
     <style>
         html { scroll-behavior: smooth; }
         .hero-bg { background: linear-gradient(180deg, #FFF9F3 0%, #FFFFFF 100%); }
-        .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); transition: all 0.3s; }
-        
-        /* 관리자 패널 기본 숨김 */
-        #admin-panel { display: none; position: fixed; bottom: 20px; right: 20px; width: 340px; z-index: 1000; }
-        #admin-panel.active { display: block; }
-        
-        /* 커스텀 토스트 메시지 스타일 */
-        #toast {
-            visibility: hidden;
-            min-width: 250px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 12px;
-            padding: 16px;
-            position: fixed;
-            z-index: 2000;
-            left: 50%;
-            bottom: 30px;
-            transform: translateX(-50%);
-            font-weight: bold;
-        }
-        #toast.show {
-            visibility: visible;
-            animation: fadein 0.5s, fadeout 0.5s 2.5s;
-        }
-        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
-        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+        #admin-panel { display: none; position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 1000; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        #admin-panel.active { display: block; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body class="font-sans text-slate-800">
-
-    <!-- 토스트 메시지 (성공 알림용) -->
-    <div id="toast">상담 신청이 완료되었습니다!</div>
+<body class="font-sans text-slate-800 bg-white">
 
     <!-- 네비게이션 -->
-    <header class="fixed w-full bg-white/90 backdrop-blur-md z-50 border-b border-slate-100 h-16 flex items-center px-6">
+    <header class="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100 h-16 flex items-center px-6">
         <div class="max-w-6xl mx-auto w-full flex justify-between items-center">
-            <!-- 로고 영역: 3번 클릭 시 관리자 모드 활성화 -->
-            <div class="flex items-center gap-2 cursor-pointer select-none" onclick="handleLogoClick()">
+            <!-- 비밀 클릭 영역: 로고를 3번 클릭하세요 -->
+            <div class="flex items-center gap-2 cursor-pointer select-none" onclick="secretClick()">
                 <div class="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center shadow-lg">
                     <i data-lucide="bot" class="text-white w-5 h-5"></i>
                 </div>
-                <span class="font-black text-xl tracking-tighter text-slate-900">AI러키봇</span>
+                <span id="logo-text" class="font-black text-xl tracking-tighter text-slate-900">AI러키봇</span>
             </div>
-            <div class="flex items-center gap-6">
-                <a href="#models" class="hidden md:block text-sm font-bold text-slate-500 hover:text-brand-500">요금제</a>
-                <a href="#contact" class="bg-brand-dark text-white px-5 py-2 rounded-full text-xs font-black btn-hover shadow-lg">상담신청</a>
-            </div>
+            <a href="#contact" class="bg-brand-dark text-white px-5 py-2 rounded-full text-xs font-black shadow-lg hover:bg-slate-700 transition-all">상담신청</a>
         </div>
     </header>
 
     <!-- 메인 비주얼 -->
-    <section id="home" class="hero-bg pt-40 pb-20 px-6 text-center">
-        <div class="max-w-4xl mx-auto space-y-8">
-            <div class="inline-flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-orange-100 text-brand-500 font-bold text-[10px] uppercase tracking-widest">
-                <span class="w-1.5 h-1.5 bg-brand-500 rounded-full animate-ping"></span> Smart Serving Solution
-            </div>
-            <h1 class="text-5xl md:text-7xl font-black leading-tight tracking-tight text-slate-900">
+    <section class="hero-bg pt-32 pb-20 px-6 text-center">
+        <div class="max-w-3xl mx-auto space-y-6">
+            <h1 class="text-4xl md:text-6xl font-black leading-tight text-slate-900">
                 행운을 서빙하는<br><span class="text-brand-500">AI러키봇</span>
             </h1>
-            <p class="text-slate-500 text-lg font-medium italic">월 29만원대로 매장의 품격을 높이세요.</p>
+            <p class="text-slate-500 text-lg">최첨단 인공지능 서빙 로봇을 지금 만나보세요.</p>
         </div>
     </section>
 
     <!-- 요금 안내 -->
-    <section id="models" class="py-24 px-6 bg-white">
-        <div class="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
-            <div class="bg-slate-50 p-8 rounded-[40px] border border-slate-100 flex flex-col">
-                <span class="text-[10px] font-bold text-slate-400 mb-4 bg-white w-fit px-3 py-1 rounded-full">실속형</span>
-                <h3 class="text-xl font-black mb-6">러키봇 (리퍼)</h3>
-                <div class="mb-10"><span class="text-4xl font-black text-brand-500">299,000</span><span class="text-sm font-bold ml-1 text-slate-400">원/월</span></div>
+    <section id="models" class="py-16 px-6">
+        <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
+            <div class="bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                <p class="text-xs font-bold text-slate-400 mb-2">실속형 리퍼비시</p>
+                <h3 class="text-2xl font-black mb-4">러키봇 리퍼</h3>
+                <p class="text-3xl font-black text-brand-500 mb-6">월 299,000원</p>
+                <ul class="text-sm space-y-2 text-slate-600 font-medium">
+                    <li>• 정밀 점검 완료된 A급 로봇</li>
+                    <li>• 신품과 동일한 무상 AS 지원</li>
+                </ul>
             </div>
-            <div class="bg-brand-500 p-8 rounded-[40px] shadow-2xl text-white flex flex-col scale-105 z-10">
-                <span class="text-[10px] font-bold text-orange-200 mb-4 bg-brand-600 w-fit px-3 py-1 rounded-full uppercase">인기 모델</span>
-                <h3 class="text-xl font-black mb-6">러키봇 (신품)</h3>
-                <div class="mb-10"><span class="text-4xl font-black">399,000</span><span class="text-sm font-bold ml-1 opacity-70">원/월</span></div>
-            </div>
-            <div class="bg-slate-900 p-8 rounded-[40px] text-white flex flex-col">
-                <span class="text-[10px] font-bold text-slate-500 mb-4 bg-slate-800 w-fit px-3 py-1 rounded-full">프리미엄</span>
-                <h3 class="text-xl font-black mb-6">러키봇 프로</h3>
-                <div class="mb-10"><span class="text-4xl font-black">499,000</span><span class="text-sm font-bold ml-1 text-slate-500">원/월</span></div>
+            <div class="bg-brand-500 p-8 rounded-[32px] text-white shadow-xl">
+                <p class="text-xs font-bold opacity-80 mb-2">가장 많이 찾는 모델</p>
+                <h3 class="text-2xl font-black mb-4">러키봇 신품</h3>
+                <p class="text-3xl font-black mb-6">월 399,000원</p>
+                <ul class="text-sm space-y-2 opacity-90 font-medium">
+                    <li>• 최신형 AI 센서 탑재</li>
+                    <li>• 대용량 배터리로 12시간 연속 주행</li>
+                </ul>
             </div>
         </div>
     </section>
 
     <!-- 상담 신청 폼 -->
-    <section id="contact" class="py-24 px-6 bg-slate-50">
-        <div class="max-w-md mx-auto bg-white p-10 rounded-[40px] shadow-2xl border border-slate-100">
+    <section id="contact" class="py-20 px-6 bg-slate-50">
+        <div class="max-w-md mx-auto bg-white p-8 rounded-[40px] shadow-xl">
             <h2 class="text-2xl font-black text-center mb-8">무료 체험 신청</h2>
             <form id="consultation-form" class="space-y-4">
-                <input type="text" id="user-name" placeholder="매장명 또는 성함" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold border-none outline-brand-500 focus:bg-white transition-all" required>
-                <input type="tel" id="user-phone" placeholder="연락처 (010-0000-0000)" class="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold border-none outline-brand-500 focus:bg-white transition-all" required>
-                <button type="submit" id="submit-btn" class="w-full bg-brand-500 text-white py-5 rounded-2xl font-black text-lg btn-hover shadow-xl flex items-center justify-center gap-3">
-                    <span id="btn-text">신청하기</span>
-                    <div id="loading" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                </button>
+                <input type="text" id="user-name" placeholder="매장명 또는 성함" class="w-full bg-slate-50 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none transition-all" required>
+                <input type="tel" id="user-phone" placeholder="연락처 (010-0000-0000)" class="w-full bg-slate-50 rounded-2xl px-5 py-4 text-sm font-bold focus:ring-2 focus:ring-brand-500 outline-none transition-all" required>
+                <button type="submit" id="submit-btn" class="w-full bg-brand-500 text-white py-5 rounded-2xl font-black text-lg shadow-lg hover:bg-brand-600 transition-all">신청하기</button>
             </form>
         </div>
     </section>
 
-    <!-- 관리자 대시보드 UI (기본 숨김) -->
-    <div id="admin-panel" class="bg-white shadow-2xl rounded-3xl overflow-hidden border border-slate-200">
+    <!-- 관리자 패널 (기본 숨김) -->
+    <div id="admin-panel" class="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-2xl">
         <div class="bg-slate-900 p-4 flex justify-between items-center text-white">
-            <div class="flex items-center gap-2">
-                <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span class="font-bold text-[10px] uppercase">관리자 모드</span>
-            </div>
-            <div class="flex items-center gap-3">
-                <span id="submission-count" class="bg-brand-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black">0</span>
-                <button onclick="toggleAdmin()" class="text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
+            <span class="font-bold text-xs uppercase tracking-wider">신규 상담 <span id="submission-count" class="ml-1 text-brand-500">0</span>건</span>
+            <button onclick="toggleAdmin()" class="hover:text-brand-500"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
-        <div id="admin-list" class="max-h-[400px] overflow-y-auto divide-y divide-slate-50 bg-white">
-            <p class="p-12 text-center text-slate-400 text-xs italic">데이터를 불러오는 중...</p>
+        <div id="admin-list" class="max-h-[350px] overflow-y-auto bg-white">
+            <p class="p-10 text-center text-slate-400 text-xs italic text-left">데이터 로드 중...</p>
         </div>
     </div>
 
-    <footer class="py-12 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-        &copy; 2026 AI Lucky Bot. All Rights Reserved.
+    <footer class="py-10 text-center text-slate-300 text-[10px] font-bold uppercase tracking-widest">
+        &copy; 2026 AI Lucky Bot Inc.
     </footer>
 
     <script>
         lucide.createIcons();
         
-        let clickCount = 0;
-        let clickTimer;
-
-        // 로고 클릭 핸들러 (3번 클릭 시 관리자 모드 토글)
-        function handleLogoClick() {
-            clickCount++;
-            clearTimeout(clickTimer);
-            
-            if (clickCount >= 3) {
+        let count = 0;
+        let timer;
+        function secretClick() {
+            count++;
+            clearTimeout(timer);
+            if (count >= 3) {
                 toggleAdmin();
-                clickCount = 0;
+                count = 0;
             } else {
-                clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+                timer = setTimeout(() => { count = 0; }, 600);
             }
         }
 
-        function toggleAdmin() { 
-            const panel = document.getElementById('admin-panel');
-            panel.classList.toggle('active'); 
-        }
-
-        function showToast() {
-            const toast = document.getElementById("toast");
-            toast.className = "show";
-            setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+        function toggleAdmin() {
+            const p = document.getElementById('admin-panel');
+            p.classList.toggle('active');
         }
 
         document.getElementById('consultation-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const btn = document.getElementById('submit-btn');
-            const txt = document.getElementById('btn-text');
-            const loader = document.getElementById('loading');
-            
-            btn.disabled = true; 
-            txt.innerText = "전송 중..."; 
-            loader.classList.remove('hidden');
-
             const name = document.getElementById('user-name').value;
             const phone = document.getElementById('user-phone').value;
 
+            btn.disabled = true;
+            btn.innerText = "전송 중...";
+
             try {
-                // 데이터 저장
-                await window.addDoc(window.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'consultations'), {
+                const { db, appId, collection, addDoc, serverTimestamp } = window.firebase;
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'consultations'), {
                     name: name,
                     phone: phone,
-                    createdAt: window.serverTimestamp()
+                    createdAt: serverTimestamp()
                 });
                 
-                // 성공 알림 및 초기화
-                showToast();
+                // 확실한 피드백을 위해 브라우저 기본 알림창 사용
+                alert('✅ 상담 신청이 정상적으로 완료되었습니다!\n담당자가 곧 연락드리겠습니다.');
                 document.getElementById('consultation-form').reset();
-            } catch (err) { 
-                console.error("저장 실패:", err);
-                alert('연결이 불안정합니다. 잠시 후 다시 시도해주세요.'); 
-            } finally { 
-                btn.disabled = false; 
-                txt.innerText = "신청하기"; 
-                loader.classList.add('hidden'); 
+            } catch (err) {
+                console.error(err);
+                alert('❌ 전송에 실패했습니다. 다시 시도해주세요.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "신청하기";
             }
         });
     </script>
