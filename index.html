@@ -64,7 +64,11 @@
         // 인증 상태 변경 감지 후 리스너 설정
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                console.log("인증 성공:", user.uid);
                 setupRealtimeListener();
+            } else {
+                console.log("인증 정보 없음, 재시도 중...");
+                initAuth();
             }
         });
 
@@ -84,8 +88,8 @@
                 list.innerHTML = docs.map(doc => `
                     <div class="p-4 border-b border-slate-50 flex justify-between items-center bg-white hover:bg-orange-50 transition-colors text-left">
                         <div>
-                            <p class="font-black text-slate-800 text-sm">${doc.name}</p>
-                            <p class="text-xs text-brand-500 font-mono mt-0.5">${doc.phone}</p>
+                            <p class="font-black text-slate-800 text-sm">${doc.name || '이름 없음'}</p>
+                            <p class="text-xs text-brand-500 font-mono mt-0.5">${doc.phone || '번호 없음'}</p>
                         </div>
                         <p class="text-[9px] text-slate-300 font-bold uppercase">
                             ${doc.createdAt ? new Date(doc.createdAt.seconds * 1000).toLocaleString('ko-KR') : '방금 접수'}
@@ -94,6 +98,10 @@
                 `).join('') || '<p class="p-12 text-center text-slate-400 text-xs italic">상담 내역이 없습니다.</p>';
             }, (error) => {
                 console.error("Firestore 오류:", error);
+                if (error.code === 'permission-denied') {
+                    console.log("권한 재획득 시도 중...");
+                    initAuth();
+                }
             });
         }
 
@@ -106,6 +114,8 @@
         .btn-hover:hover { transform: translateY(-2px); filter: brightness(1.05); transition: all 0.3s; }
         #admin-panel { display: none; position: fixed; bottom: 90px; right: 25px; width: 340px; z-index: 1000; }
         #admin-panel.active { display: block; }
+        /* 버튼이 항상 보이도록 보정 */
+        .admin-trigger { display: flex !important; }
     </style>
 </head>
 <body class="font-sans text-slate-800">
@@ -212,7 +222,7 @@
     </div>
 
     <!-- 플로팅 관리 버튼 -->
-    <button onclick="toggleAdmin()" class="fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center border border-slate-100 text-slate-400 hover:text-brand-500 transition-all z-[999]">
+    <button onclick="toggleAdmin()" class="admin-trigger fixed bottom-6 right-6 w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center border border-slate-100 text-slate-400 hover:text-brand-500 transition-all z-[999]">
         <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
     </button>
 
@@ -230,30 +240,42 @@
         document.getElementById('consultation-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!window.auth.currentUser) {
-                alert('잠시만 기다려주세요 (인증 중)');
-                return;
-            }
-
             const btn = document.getElementById('submit-btn');
             const txt = document.getElementById('btn-text');
             const loader = document.getElementById('loading');
             
+            // 인증이 아직 안 된 경우 재시도
+            if (!window.auth.currentUser) {
+                txt.innerText = "인증 중...";
+                try {
+                    await window.auth.signInAnonymously();
+                } catch(e) {
+                    alert('네트워크 연결을 확인해주세요.');
+                    return;
+                }
+            }
+
             btn.disabled = true; 
             txt.innerText = "처리 중..."; 
             loader.classList.remove('hidden');
 
+            const name = document.getElementById('user-name').value;
+            const phone = document.getElementById('user-phone').value;
+
             try {
+                // 데이터 추가 시도
                 await window.addDoc(window.collection(window.db, 'artifacts', window.appId, 'public', 'data', 'consultations'), {
-                    name: document.getElementById('user-name').value,
-                    phone: document.getElementById('user-phone').value,
+                    name: name,
+                    phone: phone,
                     createdAt: window.serverTimestamp()
                 });
                 
+                alert('신청이 완료되었습니다!');
                 document.getElementById('consultation-form').reset();
                 document.getElementById('admin-panel').classList.add('active');
             } catch (err) { 
-                alert('오류가 발생했습니다.'); 
+                console.error("데이터 저장 오류:", err);
+                alert('잠시 후 다시 시도해주세요.'); 
             } finally { 
                 btn.disabled = false; 
                 txt.innerText = "신청하기"; 
