@@ -37,13 +37,16 @@
             border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* 버튼 비활성화 스타일 */
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
     </style>
 </head>
 <body class="font-sans text-slate-900 overflow-x-hidden">
 
     <!-- Nav -->
-    <nav class="fixed w-full top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-50">
-        <div class="max-w-7xl mx-auto px-8 h-20 flex justify-between items-center">
+    <nav class="fixed w-full top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-50 transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-8 h-20 flex justify-between items-center transition-all" id="nav-inner">
             <div class="flex items-center gap-2 cursor-pointer" id="main-logo">
                 <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200">
                     <i data-lucide="bot" class="text-white w-6 h-6"></i>
@@ -141,8 +144,9 @@
                     <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase">연락처</label>
                     <input type="tel" id="phone" placeholder="010-0000-0000" class="w-full bg-slate-50 rounded-full px-8 py-5 font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all border-none">
                 </div>
-                <button id="submit-btn" class="w-full bg-brand-500 text-white py-6 rounded-full font-black text-xl shadow-xl shadow-orange-100 hover:bg-brand-600 transition-all mt-6 flex items-center justify-center gap-3">
-                    신청하기
+                <button id="submit-btn" disabled class="w-full bg-brand-500 text-white py-6 rounded-full font-black text-xl shadow-xl shadow-orange-100 hover:bg-brand-600 transition-all mt-6 flex items-center justify-center gap-3">
+                    <div class="loading-spinner" id="btn-spinner"></div>
+                    <span id="btn-text">연결 중...</span>
                 </button>
                 <p id="status-text" class="text-center text-xs font-bold text-slate-400 mt-4 opacity-0">상태 메시지</p>
             </div>
@@ -164,72 +168,95 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global Setup
+        // Configuration
         const firebaseConfig = JSON.parse(__firebase_config);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v11';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        
+        let app, auth, db;
+        let currentUser = null;
+        let isSubmitting = false;
 
         const statusText = document.getElementById('status-text');
         const submitBtn = document.getElementById('submit-btn');
-        let currentUser = null;
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
 
-        // AUTHENTICATION FIRST (Rule 3)
-        const initAuth = async () => {
+        // Exponential Backoff Retry Function
+        const retry = async (fn, retries = 5, delay = 1000) => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth Fail:", error);
-                const adminStatus = document.getElementById('admin-status');
-                if (adminStatus) adminStatus.innerText = "인증 오류 발생. 다시 시도해 주세요.";
+                return await fn();
+            } catch (err) {
+                if (retries <= 0) throw err;
+                await new Promise(r => setTimeout(r, delay));
+                return retry(fn, retries - 1, delay * 2);
             }
         };
 
-        // Listen for auth state
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                console.log("Authenticated:", user.uid);
-                startAdminListener();
+        const initializeSite = async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Authentication with Retry (Rule 3)
+                await retry(async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                });
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUser = user;
+                        enableSubmitButton();
+                        startAdminListener();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Initialization Failed:", error);
+                btnText.innerText = "연결 오류 (새로고침)";
+                statusText.innerText = "서버 연결에 실패했습니다. 인터넷 연결을 확인해주세요.";
+                statusText.classList.add('text-red-500');
+                statusText.style.opacity = "1";
             }
-        });
+        };
 
-        // Initialize Auth
-        initAuth();
+        const enableSubmitButton = () => {
+            submitBtn.disabled = false;
+            btnSpinner.style.display = 'none';
+            btnText.innerText = "신청하기";
+        };
 
-        // Submit Consultation
+        // Submit Action
         window.sendConsultation = async () => {
-            if (!currentUser) {
-                alert("서버와 연결 중입니다. 1~2초 후 다시 시도해 주세요.");
-                return;
-            }
+            if (!currentUser || isSubmitting) return;
 
             const name = document.getElementById('name').value.trim();
             const phone = document.getElementById('phone').value.trim();
 
             if (!name || !phone) {
-                alert("정보를 모두 입력해 주세요.");
+                alert("상함과 연락처를 모두 입력해주세요.");
                 return;
             }
 
+            isSubmitting = true;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<div class="loading-spinner"></div> 전송 중...';
+            btnSpinner.style.display = 'block';
+            btnText.innerText = "전송 중...";
             statusText.style.opacity = "1";
-            statusText.innerText = "데이터를 전송하고 있습니다...";
+            statusText.innerText = "상담 정보를 안전하게 보내고 있습니다.";
 
             try {
-                // Rule 1: Correct path structure
+                // Rule 1 & Rule 3 Guard
                 const colPath = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
                 await addDoc(colPath, {
                     name,
@@ -238,73 +265,69 @@
                     createdAt: serverTimestamp()
                 });
 
-                submitBtn.innerHTML = "신청 완료";
+                // Success UI
+                btnSpinner.style.display = 'none';
+                btnText.innerText = "신청 완료";
                 submitBtn.classList.replace('bg-brand-500', 'bg-green-500');
-                statusText.innerText = "상담 신청이 성공적으로 전달되었습니다!";
+                statusText.innerText = "정상적으로 접수되었습니다. 곧 연락드리겠습니다!";
                 
                 document.getElementById('name').value = "";
                 document.getElementById('phone').value = "";
 
                 setTimeout(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = "신청하기";
                     submitBtn.classList.replace('bg-green-500', 'bg-brand-500');
+                    enableSubmitButton();
                     statusText.style.opacity = "0";
+                    isSubmitting = false;
                 }, 4000);
 
             } catch (error) {
                 console.error("Submit Error:", error);
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = "다시 신청하기";
-                statusText.innerText = "권한 오류 또는 네트워크 오류가 발생했습니다.";
+                isSubmitting = false;
+                enableSubmitButton();
+                btnText.innerText = "다시 시도";
+                statusText.innerText = "전송 실패: 권한 문제 또는 통신 장애가 발생했습니다.";
                 statusText.classList.add('text-red-500');
             }
         };
 
-        // Admin Real-time Listener
+        // Admin Listener
         function startAdminListener() {
-            if (!currentUser) return;
-            
             const colPath = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
             const adminList = document.getElementById('admin-list');
-            const adminStatus = document.getElementById('admin-status');
             
             onSnapshot(colPath, (snap) => {
                 const list = [];
                 snap.forEach(doc => list.push({id: doc.id, ...doc.data()}));
                 
-                // Rule 2: Client-side sorting
+                // Rule 2: Client-side Sort
                 list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 
                 document.getElementById('admin-count').innerText = list.length;
                 
                 if (list.length === 0) {
-                    adminList.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">상담 내역이 없습니다.</div>';
+                    adminList.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">상담 내역이 아직 없습니다.</div>';
                 } else {
                     adminList.innerHTML = list.map(item => `
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 transition-all hover:border-brand-500">
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="font-black text-slate-800">${item.name || '미입력'}</span>
-                                <span class="text-[9px] text-slate-400 font-bold bg-slate-50 px-2 py-1 rounded-md">
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-brand-500 transition-colors">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="font-black text-slate-800">${item.name || '익명'}</span>
+                                <span class="text-[9px] text-slate-400 font-bold bg-slate-50 px-2 py-1 rounded">
                                     ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : '방금 전'}
                                 </span>
                             </div>
-                            <div class="text-brand-500 font-black text-lg tracking-tight">${item.phone || '미입력'}</div>
+                            <div class="text-brand-500 font-black text-lg tracking-tight">${item.phone || '-'}</div>
                         </div>
                     `).join('');
                 }
             }, (err) => {
-                console.error("Listen error:", err);
-                adminList.innerHTML = `
-                    <div class="p-10 text-red-400 text-xs font-bold text-center">
-                        <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                        권한 부족 (Permission Denied)<br>
-                        인증 세션을 다시 확인해 주세요.
-                    </div>
-                `;
-                lucide.createIcons();
+                console.error("Snapshot Error:", err);
+                adminList.innerHTML = '<div class="p-10 text-red-400 text-xs font-bold text-center">조회 권한이 제한되었습니다.</div>';
             });
         }
+
+        // Start initialization
+        initializeSite();
     </script>
 
     <script>
@@ -314,7 +337,6 @@
             if (window.sendConsultation) window.sendConsultation();
         });
 
-        // Logo click 3 times for Admin
         let clickCount = 0;
         document.getElementById('main-logo').addEventListener('click', () => {
             clickCount++;
@@ -327,13 +349,11 @@
         }
 
         window.addEventListener('scroll', () => {
-            const nav = document.querySelector('nav');
-            if (window.scrollY > 50) {
-                nav.classList.add('h-16', 'shadow-sm');
-                nav.classList.remove('h-20');
+            const nav = document.getElementById('nav-inner');
+            if (window.scrollY > 30) {
+                nav.classList.replace('h-20', 'h-16');
             } else {
-                nav.classList.remove('h-16', 'shadow-sm');
-                nav.classList.add('h-20');
+                nav.classList.replace('h-16', 'h-20');
             }
         });
     </script>
