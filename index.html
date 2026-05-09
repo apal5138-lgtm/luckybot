@@ -3,349 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI러키봇 - 행운을 서빙합니다</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Noto Sans KR', 'sans-serif'] },
-                    colors: {
-                        brand: { 50: '#fff7ed', 500: '#f97316', 600: '#ea580c', dark: '#1e293b' }
-                    }
-                }
-            }
-        }
-    </script>
-
+    <title>AI러키봇 — 행운을 서빙합니다</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --orange: #FF5C00;
+            --orange-light: #FF8040;
+            --dark: #0D0D0D;
+            --cream: #FFF8F2;
+            --cream2: #FFF3E8;
+            --gray: #999;
+            --text: #1a1a1a;
+            --text-sub: #666;
+            --border: rgba(0,0,0,0.08);
+            --card-bg: #ffffff;
+            --section-bg: #f9f4ef;
+        }
+
         html { scroll-behavior: smooth; }
-        .hero-bg { background: radial-gradient(circle at 50% -20%, #fff7ed 0%, #ffffff 60%); }
-        .product-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 2.5rem; }
-        .product-card:hover { transform: translateY(-10px); }
-        .admin-panel { 
-            display: none; position: fixed; top: 0; right: 0; width: 360px; height: 100%; 
-            background: white; z-index: 1000; box-shadow: -10px 0 30px rgba(0,0,0,0.05); 
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--cream);
+            color: var(--text);
+            overflow-x: hidden;
         }
-        .admin-panel.active { display: block; }
-        .loading-spinner {
-            border: 3px solid #f3f3f3; border-top: 3px solid #f97316;
-            border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;
+
+        /* ─── NAV ─── */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 5vw;
+            height: 72px;
+            background: rgba(255,248,242,0.92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            transition: height 0.3s ease, box-shadow 0.3s ease;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        nav.scrolled { height: 58px; box-shadow: 0 4px 24px rgba(0,0,0,0.07); }
+        nav.scrolled .logo-text { color: var(--dark); }
+        nav.scrolled .nav-links a { color: #555; }
+        nav.scrolled .nav-links a:hover { color: var(--dark); }
+
+        .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; cursor: pointer; }
+        .logo-icon {
+            width: 38px; height: 38px; background: var(--orange);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;
+        }
+        .logo-text {
+            font-family: 'Playfair Display', serif; font-size: 1.25rem;
+            color: var(--dark); letter-spacing: -0.5px; transition: color 0.4s;
+        }
+
+        .nav-links { display: flex; align-items: center; gap: 32px; }
+        .nav-links a { color: #555; font-size: 13px; font-weight: 500; text-decoration: none; transition: color 0.2s; }
+        .nav-links a:hover { color: var(--dark); }
+        .nav-cta {
+            background: var(--orange); color: #fff; padding: 10px 24px; border-radius: 100px;
+            font-size: 13px; font-weight: 700; text-decoration: none; transition: background 0.2s, transform 0.15s;
+        }
+        .nav-cta:hover { background: var(--orange-light); transform: translateY(-1px); }
+
+        /* ─── HERO ─── */
+        .hero {
+            min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 120px 5vw 80px;
+            position: relative; overflow: hidden;
+            background: linear-gradient(160deg, #fff8f2 0%, #ffffff 50%, #fff3e8 100%);
+            color: var(--dark);
+        }
+        .hero::before {
+            content: ''; position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
+            width: 800px; height: 800px;
+            background: radial-gradient(circle, rgba(255,92,0,0.10) 0%, transparent 65%);
+            pointer-events: none;
+        }
+        .hero::after {
+            content: ''; position: absolute; bottom: -100px; right: -100px;
+            width: 400px; height: 400px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,92,0,0.07) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(255,92,0,0.08); border: 1px solid rgba(255,92,0,0.25);
+            color: var(--orange); padding: 6px 16px; border-radius: 100px;
+            font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+            margin-bottom: 40px; animation: fadeUp 0.8s ease both;
+        }
+        .hero-badge::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .hero h1 {
+            font-family: 'Playfair Display', serif; font-size: clamp(3rem, 8vw, 6.5rem);
+            line-height: 1.05; letter-spacing: -2px; margin-bottom: 28px;
+            color: var(--dark); animation: fadeUp 0.8s 0.1s ease both;
+        }
+        .hero h1 em { font-style: normal; color: var(--orange); }
+        .hero-desc {
+            color: #777; font-size: clamp(15px, 2vw, 18px); line-height: 1.7;
+            max-width: 520px; margin: 0 auto 52px; animation: fadeUp 0.8s 0.2s ease both;
+        }
+        .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; animation: fadeUp 0.8s 0.3s ease both; }
+
+        .btn-primary {
+            background: var(--orange); color: #fff; padding: 16px 40px; border-radius: 100px;
+            font-size: 15px; font-weight: 700; text-decoration: none; border: none; cursor: pointer;
+            transition: all 0.2s; display: inline-block;
+        }
+        .btn-primary:hover { background: var(--orange-light); transform: translateY(-2px); box-shadow: 0 16px 40px rgba(255,92,0,0.35); }
+        .btn-ghost {
+            background: transparent; color: var(--dark); padding: 16px 40px; border-radius: 100px;
+            font-size: 15px; font-weight: 500; text-decoration: none; border: 1px solid rgba(0,0,0,0.15);
+            cursor: pointer; transition: all 0.2s; display: inline-block;
+        }
+        .btn-ghost:hover { border-color: rgba(0,0,0,0.35); background: rgba(0,0,0,0.04); }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ─── STATS ─── */
+        .stats {
+            display: flex; justify-content: center; gap: 0;
+            border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+            margin: 0 5vw; background: #fff;
+        }
+        .stat { flex: 1; max-width: 220px; padding: 40px 20px; text-align: center; border-right: 1px solid var(--border); }
+        .stat:last-child { border-right: none; }
+        .stat-num { font-family: 'Playfair Display', serif; font-size: 2.8rem; color: var(--orange); line-height: 1; margin-bottom: 8px; }
+        .stat-label { font-size: 12px; color: var(--text-sub); font-weight: 500; }
+
+        /* ─── PRODUCTS ─── */
+        #products { padding: 120px 5vw; max-width: 1200px; margin: 0 auto; }
+        .section-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--orange); margin-bottom: 16px; }
+        .section-title { font-family: 'Playfair Display', serif; font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing: -1px; margin-bottom: 64px; color: var(--text); }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+
+        .card {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 28px; padding: 40px 36px;
+            display: flex; flex-direction: column; position: relative; overflow: hidden;
+            transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s, border-color 0.3s;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+        }
+        .card:hover { transform: translateY(-8px); box-shadow: 0 16px 48px rgba(0,0,0,0.1); border-color: rgba(255,92,0,0.25); }
+        .card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,92,0,0.4), transparent);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .card:hover::before { opacity: 1; }
+
+        .card.featured { background: var(--dark); border-color: transparent; }
+        .card.featured::before { opacity: 1; }
+        .card.featured .card-badge { color: var(--orange); }
+        .card.featured .card-name { color: #fff; }
+        .card.featured .card-sub { color: rgba(255,255,255,0.45); }
+        .card.featured .card-lump { color: rgba(255,255,255,0.4); border-bottom-color: rgba(255,255,255,0.08); }
+        .card.featured .card-lump span { color: #fff; }
+        .card.featured .card-features li { color: rgba(255,255,255,0.7); border-bottom-color: rgba(255,255,255,0.06); }
+        .card.featured .card-price .unit { color: rgba(255,255,255,0.4); }
+
+        .card-badge { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--orange); margin-bottom: 20px; }
+        .card-name { font-family: 'Playfair Display', serif; font-size: 1.6rem; margin-bottom: 8px; color: var(--text); }
+        .card-sub { font-size: 12px; color: var(--text-sub); margin-bottom: 32px; }
+        .card-price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 8px; }
+        .card-price .amount { font-family: 'Playfair Display', serif; font-size: 2.8rem; color: var(--orange); line-height: 1; }
+        .card-price .unit { font-size: 13px; color: var(--text-sub); }
+        .card-lump { font-size: 12px; color: var(--text-sub); margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+        .card-lump span { color: var(--text); font-weight: 700; }
+        .card-features { list-style: none; flex-grow: 1; }
+        .card-features li { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-sub); padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .card-features li:last-child { border-bottom: none; }
+        .feat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+
+        /* ─── CONTACT ─── */
+        #contact { padding: 120px 5vw; background: var(--section-bg); border-top: 1px solid var(--border); }
+        .contact-inner { max-width: 560px; margin: 0 auto; text-align: center; }
+        .contact-inner .section-title { margin-bottom: 12px; }
+        .contact-inner .contact-desc { color: var(--text-sub); font-size: 15px; margin-bottom: 52px; line-height: 1.7; }
+
+        .form-group { margin-bottom: 16px; text-align: left; }
+        .form-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-sub); margin-bottom: 10px; margin-left: 4px; }
+        .form-input {
+            width: 100%; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 16px;
+            padding: 18px 24px; font-size: 15px; font-weight: 500; color: var(--text);
+            font-family: 'Noto Sans KR', sans-serif; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input::placeholder { color: #bbb; }
+        .form-input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255,92,0,0.08); }
+
+        #submit-btn {
+            width: 100%; margin-top: 24px; background: var(--orange); color: #fff;
+            border: none; border-radius: 16px; padding: 20px; font-size: 15px; font-weight: 700;
+            font-family: 'Noto Sans KR', sans-serif; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s;
+        }
+        #submit-btn:hover:not(:disabled) { background: var(--orange-light); transform: translateY(-2px); box-shadow: 0 12px 32px rgba(255,92,0,0.25); }
+        #submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        #submit-btn.success { background: #16a34a; }
+
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #status-msg { margin-top: 14px; font-size: 13px; font-weight: 600; text-align: center; min-height: 20px; }
+        #status-msg.success { color: #16a34a; }
+        #status-msg.error { color: #dc2626; }
+
+        /* ─── FOOTER ─── */
+        footer { padding: 40px 5vw; border-top: 1px solid var(--border); background: #fff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+        footer p { font-size: 11px; color: #aaa; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* ─── ADMIN PANEL ─── */
+        #admin-panel { display: none; position: fixed; top: 0; right: 0; width: 380px; height: 100%; background: #fff; z-index: 999; box-shadow: -20px 0 60px rgba(0,0,0,0.12); border-left: 1px solid var(--border); flex-direction: column; }
+        #admin-panel.active { display: flex; }
+        .admin-header { padding: 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .admin-header h4 { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--text); }
+        .admin-close { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 22px; line-height: 1; transition: color 0.2s; }
+        .admin-close:hover { color: var(--text); }
+        #admin-list { flex: 1; overflow-y: auto; padding: 16px; background: var(--section-bg); }
+        .admin-item { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; margin-bottom: 10px; }
+        .admin-item-name { font-weight: 700; margin-bottom: 6px; color: var(--text); }
+        .admin-item-phone { color: var(--orange); font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+        .admin-item-time { font-size: 11px; color: var(--gray); }
+        .admin-empty { text-align: center; padding: 60px 20px; color: var(--gray); font-size: 13px; }
+        .admin-clear { margin: 12px 16px; background: transparent; border: 1px solid var(--border); border-radius: 12px; padding: 12px; font-size: 12px; color: var(--gray); cursor: pointer; width: calc(100% - 32px); font-family: 'Noto Sans KR', sans-serif; transition: all 0.2s; }
+        .admin-clear:hover { color: #dc2626; border-color: rgba(220,38,38,0.3); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
     </style>
 </head>
-<body class="font-sans text-slate-900 overflow-x-hidden">
+<body>
 
-    <!-- Nav -->
-    <nav class="fixed w-full top-0 z-[100] bg-white/80 backdrop-blur-md border-b border-slate-50 transition-all duration-300">
-        <div class="max-w-7xl mx-auto px-8 h-20 flex justify-between items-center transition-all" id="nav-inner">
-            <div class="flex items-center gap-2 cursor-pointer" id="main-logo">
-                <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-200">
-                    <i data-lucide="bot" class="text-white w-6 h-6"></i>
-                </div>
-                <span class="text-xl font-black tracking-tight">AI러키봇</span>
-            </div>
-            <div class="flex items-center gap-8 text-[13px] font-bold">
-                <a href="#products" class="text-slate-500 hover:text-brand-500">요금제</a>
-                <button onclick="location.href='#contact'" class="bg-brand-dark text-white px-6 py-2.5 rounded-full hover:bg-slate-700 transition-all">상담신청</button>
-            </div>
+<nav id="navbar">
+    <div class="logo" id="main-logo">
+        <div class="logo-icon">🤖</div>
+        <span class="logo-text">AI러키봇</span>
+    </div>
+    <div class="nav-links">
+        <a href="#products">요금제</a>
+        <a href="#contact" class="nav-cta">상담신청</a>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="hero-badge">Smart Serving Solution</div>
+    <h1>가장 완벽한 서빙,<br><em>러키봇</em>과 함께</h1>
+    <p class="hero-desc">복잡한 설정 없이 바로 시작하세요.<br>매장의 효율을 극대화하는 스마트 서빙 솔루션.</p>
+    <div class="hero-actions">
+        <a href="#contact" class="btn-primary">무료 상담 신청</a>
+        <a href="#products" class="btn-ghost">요금제 보기</a>
+    </div>
+</section>
+
+<div class="stats">
+    <div class="stat"><div class="stat-num">98%</div><div class="stat-label">고객 만족도</div></div>
+    <div class="stat"><div class="stat-num">500+</div><div class="stat-label">도입 매장 수</div></div>
+    <div class="stat"><div class="stat-num">3D</div><div class="stat-label">LiDAR 장착</div></div>
+    <div class="stat"><div class="stat-num">24h</div><div class="stat-label">전담 A/S</div></div>
+</div>
+
+<section id="products">
+    <p class="section-label">요금제</p>
+    <h2 class="section-title">매장에 맞는 플랜을<br>선택하세요</h2>
+    <div class="cards">
+        <div class="card">
+            <p class="card-badge">리퍼비시 특가</p>
+            <h3 class="card-name">러키봇 실속형</h3>
+            <p class="card-sub">검증된 성능, 합리적인 가격</p>
+            <div class="card-price"><span class="amount">299,000</span><span class="unit">원 / 월</span></div>
+            <p class="card-lump">일시불 <span>950만원</span></p>
+            <ul class="card-features">
+                <li><span class="feat-dot"></span>전문가 정밀 검수 완료</li>
+                <li><span class="feat-dot"></span>신품급 외관 및 성능</li>
+                <li><span class="feat-dot"></span>기본 A/S 포함</li>
+            </ul>
         </div>
-    </nav>
-
-    <!-- Hero -->
-    <section class="hero-bg pt-44 pb-24 px-6 text-center">
-        <div class="max-w-4xl mx-auto">
-            <div class="inline-block px-4 py-1.5 bg-orange-50 text-brand-600 rounded-full text-[11px] font-black mb-8 border border-orange-100">
-                SMART SERVING SOLUTION
-            </div>
-            <h1 class="text-5xl md:text-7xl font-black leading-[1.1] mb-8 tracking-tighter">
-                가장 완벽한 서빙,<br><span class="text-brand-500">러키봇</span>과 함께
-            </h1>
-            <p class="text-slate-400 text-lg md:text-xl font-medium mb-12">
-                복잡한 설정 없이 바로 시작하세요. 매장의 효율을 극대화합니다.
-            </p>
+        <div class="card featured">
+            <p class="card-badge">✦ Best Choice</p>
+            <h3 class="card-name">러키봇 신품</h3>
+            <p class="card-sub">가장 많이 선택하는 플랜</p>
+            <div class="card-price"><span class="amount">399,000</span><span class="unit">원 / 월</span></div>
+            <p class="card-lump">일시불 <span>1,180만원</span></p>
+            <ul class="card-features">
+                <li><span class="feat-dot"></span>최신 3D LiDAR 탑재</li>
+                <li><span class="feat-dot"></span>대용량 배터리 시스템</li>
+                <li><span class="feat-dot"></span>1년 무상 A/S</li>
+            </ul>
         </div>
-    </section>
-
-    <!-- Products -->
-    <section id="products" class="py-20 px-6 max-w-7xl mx-auto">
-        <div class="grid md:grid-cols-3 gap-8">
-            <!-- 리퍼비시 -->
-            <div class="product-card bg-slate-50/50 p-10 border border-slate-100 flex flex-col">
-                <span class="text-[10px] font-black text-slate-400 uppercase mb-2">리퍼비시 특가</span>
-                <h3 class="text-2xl font-black mb-6">러키봇 실속형</h3>
-                <div class="flex items-baseline gap-1 mb-6">
-                    <span class="text-4xl font-black text-brand-500">299,000</span>
-                    <span class="text-sm font-bold text-slate-400">원/월</span>
-                </div>
-                <ul class="space-y-4 mb-10 text-sm font-bold text-slate-500 flex-grow">
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 전문가 정밀 검수 완료</li>
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 신품급 외관 및 성능</li>
-                </ul>
-                <div class="pt-6 border-t border-slate-200">
-                    <span class="text-[10px] font-bold text-slate-400 block mb-1">일시불가</span>
-                    <span class="text-xl font-black">950만원</span>
-                </div>
-            </div>
-            <!-- 신품 -->
-            <div class="product-card bg-brand-dark p-10 shadow-2xl shadow-slate-200 flex flex-col text-white">
-                <span class="text-[10px] font-black text-brand-500 uppercase mb-2">Best Choice</span>
-                <h3 class="text-2xl font-black mb-6">러키봇 신품</h3>
-                <div class="flex items-baseline gap-1 mb-6">
-                    <span class="text-4xl font-black text-brand-500">399,000</span>
-                    <span class="text-sm font-bold text-slate-500">원/월</span>
-                </div>
-                <ul class="space-y-4 mb-10 text-sm font-bold text-slate-300 flex-grow">
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 최신 3D LiDAR 탑재</li>
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-brand-500"></i> 대용량 배터리 시스템</li>
-                </ul>
-                <div class="pt-6 border-t border-slate-700">
-                    <span class="text-[10px] font-bold text-slate-500 block mb-1">일시불가</span>
-                    <span class="text-xl font-black">1,180만원</span>
-                </div>
-            </div>
-            <!-- 프로 -->
-            <div class="product-card bg-orange-500 p-10 shadow-2xl shadow-orange-100 flex flex-col text-white">
-                <span class="text-[10px] font-black text-orange-100 uppercase mb-2">Premium</span>
-                <h3 class="text-2xl font-black mb-6">러키봇 프로</h3>
-                <div class="flex items-baseline gap-1 mb-6">
-                    <span class="text-4xl font-black text-white">499,000</span>
-                    <span class="text-sm font-bold text-orange-100">원/월</span>
-                </div>
-                <ul class="space-y-4 mb-10 text-sm font-bold text-white/90 flex-grow">
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-orange-200"></i> 대형 매장 특화 고성능</li>
-                    <li class="flex items-center gap-2"><i data-lucide="check" class="w-4 h-4 text-orange-200"></i> 멀티 로봇 관제 솔루션</li>
-                </ul>
-                <div class="pt-6 border-t border-white/20">
-                    <span class="text-[10px] font-bold text-orange-100 block mb-1">일시불가</span>
-                    <span class="text-xl font-black">1,540만원</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Form -->
-    <section id="contact" class="py-32 px-6 bg-slate-50">
-        <div class="max-w-xl mx-auto bg-white p-12 md:p-16 rounded-[3rem] shadow-2xl shadow-slate-200 border border-slate-100 text-center">
-            <h2 class="text-3xl font-black mb-2">무료 상담</h2>
-            <p class="text-slate-400 text-sm font-medium mb-12">정보를 남겨주시면 전문가가 연락드립니다.</p>
-            
-            <div class="space-y-4 text-left">
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase">매장명 또는 성함</label>
-                    <input type="text" id="name" placeholder="예: 러키식당" class="w-full bg-slate-50 rounded-full px-8 py-5 font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all border-none">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-slate-400 ml-5 mb-2 uppercase">연락처</label>
-                    <input type="tel" id="phone" placeholder="010-0000-0000" class="w-full bg-slate-50 rounded-full px-8 py-5 font-bold outline-none focus:ring-2 focus:ring-brand-500 transition-all border-none">
-                </div>
-                <button id="submit-btn" class="w-full bg-brand-500 text-white py-6 rounded-full font-black text-xl shadow-xl shadow-orange-100 hover:bg-brand-600 transition-all mt-6 flex items-center justify-center gap-3">
-                    <div class="loading-spinner hidden" id="btn-spinner"></div>
-                    <span id="btn-text">신청하기</span>
-                </button>
-                <p id="status-text" class="text-center text-xs font-bold text-slate-400 mt-4 opacity-0 transition-opacity">상태 메시지</p>
-            </div>
-        </div>
-    </section>
-
-    <footer class="py-16 text-center text-slate-300">
-        <p class="text-[10px] font-black tracking-widest">&copy; 2026 AI LUCKY BOT. ALL RIGHTS RESERVED.</p>
-    </footer>
-
-    <!-- Admin Panel -->
-    <div id="admin-panel" class="admin-panel">
-        <div class="p-6 bg-slate-900 text-white flex justify-between items-center">
-            <h4 class="text-lg font-black">상담 리스트 (<span id="admin-count">0</span>)</h4>
-            <button onclick="toggleAdmin()" class="text-white/50 hover:text-white"><i data-lucide="x"></i></button>
-        </div>
-        <div id="admin-list" class="p-4 space-y-3 overflow-y-auto h-[calc(100%-84px)] bg-slate-50">
-            <div id="admin-status" class="text-center py-20 text-slate-300 font-bold">인증 대기 중...</div>
+        <div class="card">
+            <p class="card-badge">Premium</p>
+            <h3 class="card-name">러키봇 프로</h3>
+            <p class="card-sub">대형 매장 특화 고성능 솔루션</p>
+            <div class="card-price"><span class="amount">499,000</span><span class="unit">원 / 월</span></div>
+            <p class="card-lump">일시불 <span>1,540만원</span></p>
+            <ul class="card-features">
+                <li><span class="feat-dot"></span>대형 매장 특화 고성능</li>
+                <li><span class="feat-dot"></span>멀티 로봇 관제 솔루션</li>
+                <li><span class="feat-dot"></span>전담 매니저 배정</li>
+            </ul>
         </div>
     </div>
+</section>
 
-    <!-- Firebase SDK (Modular) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+<section id="contact">
+    <div class="contact-inner">
+        <p class="section-label">무료 상담</p>
+        <h2 class="section-title">지금 바로<br>시작하세요</h2>
+        <p class="contact-desc">정보를 남겨주시면<br>전문가가 24시간 내 연락드립니다.</p>
+        <div class="form-group">
+            <label class="form-label" for="name">매장명 또는 성함</label>
+            <input type="text" id="name" class="form-input" placeholder="예: 러키식당">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="phone">연락처</label>
+            <input type="tel" id="phone" class="form-input" placeholder="010-0000-0000">
+        </div>
+        <button id="submit-btn">
+            <div class="spinner" id="btn-spinner"></div>
+            <span id="btn-text">신청하기</span>
+        </button>
+        <p id="status-msg"></p>
+    </div>
+</section>
 
-        // Global Setup
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'lucky-bot-v11';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+<footer>
+    <p>© 2026 AI Lucky Bot. All rights reserved.</p>
+    <p>문의: hello@ailuckybot.kr</p>
+</footer>
 
-        let currentUser = null;
-        let isSubmitting = false;
+<div id="admin-panel">
+    <div class="admin-header">
+        <h4>상담 리스트 (<span id="admin-count">0</span>)</h4>
+        <button class="admin-close" onclick="toggleAdmin()">✕</button>
+    </div>
+    <div id="admin-list"><div class="admin-empty">신청 내역이 없습니다.</div></div>
+    <button class="admin-clear" onclick="clearAll()">전체 삭제</button>
+</div>
 
-        const statusText = document.getElementById('status-text');
-        const submitBtn = document.getElementById('submit-btn');
+<script>
+    window.addEventListener('scroll', () => {
+        document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
+    });
+
+    let clickCount = 0, clickTimer;
+    document.getElementById('main-logo').addEventListener('click', () => {
+        clickCount++;
+        clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => clickCount = 0, 2000);
+        if (clickCount >= 3) { toggleAdmin(); clickCount = 0; }
+    });
+
+    function toggleAdmin() {
+        document.getElementById('admin-panel').classList.toggle('active');
+        if (document.getElementById('admin-panel').classList.contains('active')) renderAdmin();
+    }
+
+    const STORAGE_KEY = 'luckybot_consultations';
+    function getConsultations() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+    function saveConsultation(item) { const list = getConsultations(); list.unshift(item); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+    function clearAll() { if (confirm('모든 상담 내역을 삭제할까요?')) { localStorage.removeItem(STORAGE_KEY); renderAdmin(); } }
+    function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    function renderAdmin() {
+        const list = getConsultations();
+        const el = document.getElementById('admin-list');
+        document.getElementById('admin-count').textContent = list.length;
+        if (list.length === 0) { el.innerHTML = '<div class="admin-empty">신청 내역이 없습니다.</div>'; return; }
+        el.innerHTML = list.map(item => `
+            <div class="admin-item">
+                <div class="admin-item-name">${escapeHtml(item.name)}</div>
+                <div class="admin-item-phone">${escapeHtml(item.phone)}</div>
+                <div class="admin-item-time">${item.time}</div>
+            </div>`).join('');
+    }
+
+    let isSubmitting = false;
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+        if (isSubmitting) return;
+        const name = document.getElementById('name').value.trim();
+        const phone = document.getElementById('phone').value.trim();
+        const statusMsg = document.getElementById('status-msg');
+        if (!name || !phone) { statusMsg.textContent = '성함과 연락처를 모두 입력해주세요.'; statusMsg.className = 'error'; return; }
+        isSubmitting = true;
+        const btn = document.getElementById('submit-btn');
+        const spinner = document.getElementById('btn-spinner');
         const btnText = document.getElementById('btn-text');
-        const btnSpinner = document.getElementById('btn-spinner');
-
-        // Simple Fast Authentication
-        const startAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (e) {
-                console.error("Auth Error:", e);
-                // Fail silently and let the submission handle re-auth if needed
-            }
-        };
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                console.log("Auth Success:", user.uid);
-                startAdminListener();
-            }
-        });
-
-        // Initialize immediately
-        startAuth();
-
-        // Submit Action
-        window.sendConsultation = async () => {
-            const nameInput = document.getElementById('name');
-            const phoneInput = document.getElementById('phone');
-            const name = nameInput.value.trim();
-            const phone = phoneInput.value.trim();
-
-            if (!name || !phone) {
-                alert("성함과 연락처를 모두 입력해주세요.");
-                return;
-            }
-
-            if (isSubmitting) return;
-
-            // Ensure Auth
-            if (!currentUser) {
-                try {
-                    await startAuth();
-                    if (!auth.currentUser) throw new Error("인증 실패");
-                    currentUser = auth.currentUser;
-                } catch (err) {
-                    alert("서버 연결에 문제가 있습니다. 잠시 후 다시 시도해 주세요.");
-                    return;
-                }
-            }
-
-            isSubmitting = true;
-            submitBtn.disabled = true;
-            btnSpinner.classList.remove('hidden');
-            btnText.innerText = "전송 중...";
-            statusText.style.opacity = "1";
-            statusText.innerText = "상담 정보를 전송하고 있습니다.";
-
-            try {
-                // Rule 1: Correct Path
-                const colPath = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
-                await addDoc(colPath, {
-                    name,
-                    phone,
-                    userId: currentUser.uid,
-                    createdAt: serverTimestamp()
-                });
-
-                // Success UI
-                btnSpinner.classList.add('hidden');
-                btnText.innerText = "신청 완료";
-                submitBtn.classList.replace('bg-brand-500', 'bg-green-500');
-                statusText.innerText = "정상 접수되었습니다. 곧 연락드리겠습니다!";
-                
-                nameInput.value = "";
-                phoneInput.value = "";
-
-                setTimeout(() => {
-                    submitBtn.disabled = false;
-                    submitBtn.classList.replace('bg-green-500', 'bg-brand-500');
-                    btnText.innerText = "신청하기";
-                    statusText.style.opacity = "0";
-                    isSubmitting = false;
-                }, 4000);
-
-            } catch (error) {
-                console.error("Submit Error:", error);
-                isSubmitting = false;
-                submitBtn.disabled = false;
-                btnSpinner.classList.add('hidden');
-                btnText.innerText = "다시 시도";
-                statusText.innerText = "권한 또는 네트워크 오류가 발생했습니다.";
-                statusText.classList.add('text-red-500');
-            }
-        };
-
-        // Admin Listener
-        function startAdminListener() {
-            const colPath = collection(db, 'artifacts', appId, 'public', 'data', 'consultations');
-            const adminList = document.getElementById('admin-list');
-            
-            onSnapshot(colPath, (snap) => {
-                const list = [];
-                snap.forEach(doc => list.push({id: doc.id, ...doc.data()}));
-                
-                // Sort client-side
-                list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                
-                document.getElementById('admin-count').innerText = list.length;
-                
-                if (list.length === 0) {
-                    adminList.innerHTML = '<div class="py-20 text-center text-slate-300 font-bold">내역이 없습니다.</div>';
-                } else {
-                    adminList.innerHTML = list.map(item => `
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="font-black text-slate-800">${item.name || '미입력'}</span>
-                                <span class="text-[9px] text-slate-400 font-bold">
-                                    ${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : '방금 전'}
-                                </span>
-                            </div>
-                            <div class="text-brand-500 font-black text-lg">${item.phone || '-'}</div>
-                        </div>
-                    `).join('');
-                }
-            }, (err) => {
-                console.error("Snapshot Error:", err);
-            });
-        }
-    </script>
-
-    <script>
-        lucide.createIcons();
-
-        document.getElementById('submit-btn').addEventListener('click', () => {
-            if (window.sendConsultation) window.sendConsultation();
-        });
-
-        let clickCount = 0;
-        document.getElementById('main-logo').addEventListener('click', () => {
-            clickCount++;
-            if (clickCount >= 3) { toggleAdmin(); clickCount = 0; }
-            setTimeout(() => clickCount = 0, 2000);
-        });
-
-        function toggleAdmin() {
-            document.getElementById('admin-panel').classList.toggle('active');
-        }
-
-        window.addEventListener('scroll', () => {
-            const nav = document.getElementById('nav-inner');
-            if (window.scrollY > 30) {
-                nav.classList.replace('h-20', 'h-16');
-            } else {
-                nav.classList.replace('h-16', 'h-20');
-            }
-        });
-    </script>
+        btn.disabled = true; spinner.style.display = 'block'; btnText.textContent = '전송 중...';
+        statusMsg.textContent = ''; statusMsg.className = '';
+        await new Promise(r => setTimeout(r, 800));
+        saveConsultation({ name, phone, time: new Date().toLocaleString('ko-KR') });
+        spinner.style.display = 'none'; btnText.textContent = '✓ 신청 완료';
+        btn.classList.add('success');
+        statusMsg.textContent = '정상 접수되었습니다. 곧 연락드리겠습니다!'; statusMsg.className = 'success';
+        document.getElementById('name').value = ''; document.getElementById('phone').value = '';
+        setTimeout(() => {
+            btn.disabled = false; btn.classList.remove('success'); btnText.textContent = '신청하기';
+            statusMsg.textContent = ''; statusMsg.className = ''; isSubmitting = false;
+        }, 4000);
+    });
+</script>
 </body>
 </html>
